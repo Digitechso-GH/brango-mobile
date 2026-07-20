@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert, Image } from "react-native";
 import { useOrders } from "../hooks/useOrders";
 
+import { trackingService } from "../services/TrackingService";
+
 export const CameraScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
   const { uploadEvidence, updateStatus, isUploadingEvidence } = useOrders();
@@ -28,6 +30,9 @@ export const CameraScreen = ({ route, navigation }: any) => {
 
       // 3. Cambiar estado a Entregado
       await updateStatus({ orderId, status: "DELIVERED" });
+
+      // 4. Detener rastreo y apagar foreground service
+      await trackingService.stopTracking();
 
       Alert.alert("Entregado", "La evidencia fue subida con éxito y el pedido se marcó como Entregado.");
       navigation.navigate("Roadmap");

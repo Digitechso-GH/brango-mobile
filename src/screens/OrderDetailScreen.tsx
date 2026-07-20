@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert, Linking } from "react-native";
 import { useOrders } from "../hooks/useOrders";
+import { trackingService } from "../services/TrackingService";
 
 export const OrderDetailScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
@@ -19,7 +20,12 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
   const handleStartRoute = async () => {
     try {
       await updateStatus({ orderId, status: "IN_TRANSIT" });
-      Alert.alert("Éxito", "Recorrido iniciado. El cliente ha sido notificado por WhatsApp.");
+      const started = await trackingService.startTracking(orderId);
+      if (started) {
+        Alert.alert("Éxito", "Recorrido iniciado. Transmitiendo ubicación en segundo plano.");
+      } else {
+        Alert.alert("Alerta", "Recorrido iniciado, pero verifica los permisos de ubicación.");
+      }
     } catch (e) {
       Alert.alert("Error", "No se pudo iniciar el recorrido.");
     }
@@ -27,7 +33,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
   const handleObserveOrder = async () => {
     Alert.prompt(
-      "Registrar Observación",
+      "Registrar Incidencia",
       "Escribe el motivo del retraso o incidencia:",
       [
         { text: "Cancelar", style: "cancel" },
@@ -36,7 +42,8 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           onPress: async (text?: string) => {
             try {
               await updateStatus({ orderId, status: "OBSERVED" });
-              Alert.alert("Observado", "El pedido ha sido marcado como observado.");
+              await trackingService.stopTracking();
+              Alert.alert("Incidencia Registrada", "El pedido ha sido marcado como observado.");
             } catch (e) {
               Alert.alert("Error", "No se pudo actualizar el estado.");
             }

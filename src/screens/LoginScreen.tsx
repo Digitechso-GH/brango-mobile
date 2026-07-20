@@ -1,33 +1,60 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from "react-native";
 import { useStore } from "../store/useStore";
+import axios from "axios";
+
+const API_URL = Platform.select({
+  android: "http://10.0.2.2:3001",
+  ios: "http://localhost:3001",
+  default: "http://localhost:3001",
+});
 
 export const LoginScreen = () => {
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const login = useStore((state) => state.login);
 
   const handleLogin = async () => {
-    if (!phone || !password) {
+    if (!email || !password) {
       Alert.alert("Error", "Por favor completa todos los campos.");
       return;
     }
     
     setLoading(true);
-    // Simulación de Login seguro
-    setTimeout(() => {
+    try {
+      const res = await axios.post(`${API_URL}/auth/login`, {
+        email: email.trim(),
+        password,
+      });
+
+      const data = res.data.data;
+      if (data && data.token && data.user) {
+        if (data.user.rol !== "SYS_DRIVER") {
+          Alert.alert("Acceso denegado", "Este portal es exclusivo para conductores.");
+          setLoading(false);
+          return;
+        }
+
+        login(
+          {
+            id: data.user.id,
+            name: data.user.nombre,
+            email: data.user.email,
+            plate: data.user.unidad || "Sin placa",
+            driverId: data.user.driverId,
+          },
+          data.token
+        );
+      } else {
+        throw new Error("Respuesta de autenticación incompleta");
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Correo o contraseña incorrectos.";
+      Alert.alert("Error de ingreso", msg);
+    } finally {
       setLoading(false);
-      login(
-        {
-          id: "USR-001",
-          name: "Carlos Mendoza",
-          email: "carlos@brango.com",
-          plate: "ABC-123",
-        },
-        "mock-jwt-token-xyz"
-      );
-    }, 1200);
+    }
   };
 
   return (
@@ -35,19 +62,20 @@ export const LoginScreen = () => {
       <View style={styles.card}>
         <Text style={styles.brandTitle}>Bran Go</Text>
         <Text style={styles.subtitle}>Portal de Conductores</Text>
-
+ 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Celular</Text>
+          <Text style={styles.label}>Correo Electrónico</Text>
           <TextInput
             style={styles.input}
-            placeholder="999 999 999"
+            placeholder="conductor@brango.com"
             placeholderTextColor="#94A3B8"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
         </View>
-
+ 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Contraseña</Text>
           <TextInput
@@ -59,7 +87,7 @@ export const LoginScreen = () => {
             onChangeText={setPassword}
           />
         </View>
-
+ 
         <TouchableOpacity 
           style={styles.button} 
           onPress={handleLogin}

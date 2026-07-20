@@ -4,17 +4,18 @@ import { useStore } from "../store/useStore";
 
 export const useOrders = () => {
   const token = useStore((state) => state.token);
+  const user = useStore((state) => state.user);
   const queryClient = useQueryClient();
 
   const ordersQuery = useQuery({
-    queryKey: ["orders", token],
-    queryFn: () => fetchAssignedOrders(token || ""),
-    enabled: !!token,
+    queryKey: ["orders", token, user?.driverId],
+    queryFn: () => fetchAssignedOrders(token || "", user?.driverId || ""),
+    enabled: !!token && !!user?.driverId,
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: Order["status"] }) =>
-      updateOrderStatus(token || "", orderId, status),
+      updateOrderStatus(token || "", orderId, status, user?.id || ""),
     onSuccess: (data) => {
       // Invalidar cache para refrescar datos automáticamente
       queryClient.invalidateQueries({ queryKey: ["orders", token] });

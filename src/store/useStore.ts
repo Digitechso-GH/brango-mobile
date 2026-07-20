@@ -1,10 +1,12 @@
 import { create } from "zustand";
+import { socketManager } from "../services/socketManager";
 
 interface User {
   id: string;
   name: string;
   email: string;
   plate: string;
+  driverId?: string;
 }
 
 interface Location {
@@ -34,8 +36,14 @@ export const useStore = create<AppState>((set) => ({
   lastKnownLocation: null,
   isTrackingActive: false,
 
-  login: (user, token) => set({ user, token }),
-  logout: () => set({ user: null, token: null, currentRouteId: null, isTrackingActive: false }),
+  login: (user, token) => {
+    socketManager.connect(token);
+    set({ user, token });
+  },
+  logout: () => {
+    socketManager.disconnect();
+    set({ user: null, token: null, currentRouteId: null, isTrackingActive: false });
+  },
   setRouteActive: (routeId) => set({ currentRouteId: routeId }),
   updateLocation: (location) => set({ lastKnownLocation: location }),
   setTrackingActive: (active) => set({ isTrackingActive: active }),
