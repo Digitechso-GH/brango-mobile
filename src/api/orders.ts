@@ -1,11 +1,5 @@
 import axios from "axios";
-import { Platform } from "react-native";
-
-const API_URL = Platform.select({
-  android: "http://10.0.2.2:3001",
-  ios: "http://localhost:3001",
-  default: "http://localhost:3001",
-});
+import { API_URL } from "../config/env";
 
 export interface Order {
   id: string;

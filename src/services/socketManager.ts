@@ -1,11 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import { Platform } from "react-native";
-
-const API_URL = Platform.select({
-  android: "http://10.0.2.2:3001",
-  ios: "http://localhost:3001",
-  default: "http://localhost:3001",
-});
+import { API_URL, TRACKING_EVENTS, LOCATION_EVENTS } from "../config/env";
 
 class SocketManager {
   private socket: Socket | null = null;
@@ -45,10 +39,10 @@ class SocketManager {
 
   sendLocation(latitud: number, longitud: number, evento?: string, pedidoId?: string) {
     if (this.socket?.connected) {
-      this.socket.emit("location_update", {
+      this.socket.emit(TRACKING_EVENTS.LOCATION_UPDATE, {
         latitud,
         longitud,
-        evento: evento || "30_SEC_INTERVAL",
+        evento: evento || LOCATION_EVENTS.INTERVAL_30_SEC,
         pedidoId,
       });
       console.log(`Ubicación enviada por socket: (${latitud}, ${longitud})`);

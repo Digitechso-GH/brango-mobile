@@ -1,13 +1,8 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from "react-native";
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useStore } from "../store/useStore";
 import axios from "axios";
-
-const API_URL = Platform.select({
-  android: "http://10.0.2.2:3001",
-  ios: "http://localhost:3001",
-  default: "http://localhost:3001",
-});
+import { API_URL } from "../config/env";
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState("");

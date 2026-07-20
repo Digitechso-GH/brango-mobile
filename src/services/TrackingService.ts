@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { socketManager } from "./socketManager";
+import { LOCATION_EVENTS } from "../config/env";
 
 const LOCATION_TASK_NAME = "BACKGROUND_LOCATION_TASK";
 
@@ -24,7 +25,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
       socketManager.sendLocation(
         latitude,
         longitude,
-        "30_SEC_INTERVAL",
+        LOCATION_EVENTS.INTERVAL_30_SEC,
         activeOrderId || undefined
       );
     }
