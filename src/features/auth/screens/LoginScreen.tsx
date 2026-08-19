@@ -40,16 +40,6 @@ export const LoginScreen = () => {
         const token = data.token;
         const refreshToken = data.refreshToken;
 
-        try {
-          await queryClient.prefetchQuery({
-            queryKey: ["orders", token, driverId],
-            queryFn: () => fetchAssignedOrders(driverId || undefined),
-            staleTime: 1000 * 60 * 5,
-          });
-        } catch (e) {
-          // Si falla la precarga, el hook useOrders hara el intento en RoadmapScreen
-        }
-
         await login(
           {
             id: data.user.id,
@@ -61,6 +51,16 @@ export const LoginScreen = () => {
           data.token,
           data.refreshToken
         );
+
+        try {
+          await queryClient.prefetchQuery({
+            queryKey: ["orders", token, driverId],
+            queryFn: () => fetchAssignedOrders(driverId || undefined),
+            staleTime: 1000 * 60 * 5,
+          });
+        } catch (e) {
+          // Si falla la precarga, el hook useOrders hara el intento en RoadmapScreen
+        }
       } else {
         throw new Error("Respuesta de autenticación incompleta");
       }
