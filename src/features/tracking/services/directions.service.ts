@@ -75,22 +75,39 @@ export async function getStreetRoute(origin: LatLng, destination: LatLng): Promi
   return [origin, destination];
 }
 
-/**
- * Recorre una serie de puntos de paso (waypoints) y obtiene la ruta navegable por calles completa
- */
 export async function getFullStreetPath(waypoints: LatLng[]): Promise<LatLng[]> {
   if (!waypoints || waypoints.length < 2) return waypoints || [];
-  const fullPath: LatLng[] = [];
 
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const segment = await getStreetRoute(waypoints[i], waypoints[i + 1]);
-    if (i === 0) {
-      fullPath.push(...segment);
-    } else {
-      fullPath.push(...segment.slice(1));
-    }
+  if (!GOOGLE_MAPS_API_KEY) {
+    return waypoints;
   }
 
-  return fullPath;
+  const origin = waypoints[0];
+  const destination = waypoints[waypoints.length - 1];
+  const intermediates = waypoints.slice(1, -1);
+
+  let waypointsParam = "";
+  if (intermediates.length > 0) {
+    const joined = intermediates.map((w) => `${w.latitude},${w.longitude}`).join("|");
+    waypointsParam = `&waypoints=${joined}`;
+  }
+
+  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}${waypointsParam}&key=${GOOGLE_MAPS_API_KEY}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status === "OK" && data.routes && data.routes.length > 0) {
+      const points = data.routes[0]?.overview_polyline?.points;
+      if (points) {
+        return decodePolyline(points);
+      }
+    }
+  } catch (error) {
+    console.log("Error consultando la ruta anidada completa:", error);
+  }
+
+  return waypoints;
 }
 

@@ -41,26 +41,35 @@ export const GpsWarningBanner = () => {
       return;
     }
 
-    try {
-      // 1. Activar el servicio de ubicación directamente por el diálogo nativo de Android
-      if (Platform.OS === "android") {
+      // 1. Activar el servicio de ubicación (Antena GPS)
+      let hasServices = await Location.hasServicesEnabledAsync();
+      if (!hasServices && Platform.OS === "android") {
         try {
           await Location.enableNetworkProviderAsync();
+          hasServices = await Location.hasServicesEnabledAsync();
         } catch (e) {
-          // El usuario presionó "No gracias" en el cuadro nativo
+          console.log("El usuario canceló encender el GPS");
         }
       }
 
-      // 2. Solicitar permisos de primer plano mediante diálogo nativo si hicieran falta
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      const hasServices = await Location.hasServicesEnabledAsync();
-
-      if (hasServices && status === "granted") {
-        setIsGpsDisabled(false);
+      if (!hasServices) {
+        // Si sigue sin servicios, lo mandamos a los ajustes generales de ubicación
+        if (Platform.OS === "android") {
+          await Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS");
+        }
+        return;
       }
-    } catch (e) {
-      console.log("Error activando servicio GPS nativo:", e);
-    }
+
+      // 2. Solicitar permisos de primer plano
+      const permissionResponse = await Location.requestForegroundPermissionsAsync();
+      
+      if (permissionResponse.status === "granted") {
+        setIsGpsDisabled(false);
+      } else if (!permissionResponse.canAskAgain) {
+        // El usuario le dio a "No volver a preguntar"
+        window.alert("Debes habilitar los permisos de ubicación manualmente en las opciones de la aplicación.");
+        await Linking.openSettings();
+      }
   };
 
   if (!isGpsDisabled) return null;
