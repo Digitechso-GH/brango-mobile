@@ -106,21 +106,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* Botones de Reordenación flotantes a la izquierda, visibles sólo si está pendiente */}
-      {!isLocked && order.status === ORDER_STATUS.PENDING && (onMoveUp || onMoveDown) && (
-        <View style={styles.reorderContainer}>
-          {onMoveUp && (
-            <TouchableOpacity style={styles.reorderBtn} onPress={onMoveUp} activeOpacity={0.7}>
-              <Text style={styles.reorderBtnText}>▲</Text>
-            </TouchableOpacity>
-          )}
-          {onMoveDown && (
-            <TouchableOpacity style={styles.reorderBtn} onPress={onMoveDown} activeOpacity={0.7}>
-              <Text style={styles.reorderBtnText}>▼</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
     </View>
   );
 };

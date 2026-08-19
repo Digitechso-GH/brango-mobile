@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const PaginationMetaSchema = z.object({
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
 export const OrderSchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
@@ -37,6 +44,12 @@ export const RouteAssignmentSchema = z.object({
   originAddress: z.string().nullable().optional(),
   createdAt: z.string().or(z.date()),
   updatedAt: z.string().or(z.date()),
+  evidences: z.array(z.any()).optional(),
+});
+
+export const PaginatedOrdersResponseSchema = z.object({
+  data: z.array(z.intersection(OrderSchema, z.object({ assignments: z.array(RouteAssignmentSchema).optional() }))),
+  meta: PaginationMetaSchema,
 });
 
 export const VehicleSchema = z.object({

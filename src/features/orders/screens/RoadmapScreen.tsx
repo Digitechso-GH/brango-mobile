@@ -57,35 +57,30 @@ export const RoadmapScreen = ({ navigation }: any) => {
     };
   }, [refetch]);
 
-  // Transmitir posición GPS inicial si el GPS está activo al abrir la pantalla de hoja de ruta
+  // Actualizar posición GPS local y sincronizar intervalo al montar la pantalla
   useEffect(() => {
     let isMounted = true;
 
-    const updateCurrentPosition = async () => {
+    trackingService.fetchConfiguredInterval();
+
+    const syncInitialPosition = async () => {
       try {
         const coords = await gpsSensorService.getCurrentLocation();
         if (coords && isMounted) {
-          const activeRouteId = useTrackingStore.getState().currentRouteId;
-          trackingService.sendLocationUpdate(
-            coords.latitude,
-            coords.longitude,
-            undefined,
-            activeRouteId || undefined
-          );
+          useTrackingStore.getState().updateLocation({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          });
         }
       } catch (err) {
         console.log("GPS no disponible o desactivado al iniciar:", err);
       }
     };
 
-    updateCurrentPosition();
-
-    // Re-chequear posición periódicamente cada 5s para detectar reactivación de GPS
-    const gpsCheckInterval = setInterval(updateCurrentPosition, 5000);
+    syncInitialPosition();
 
     return () => {
       isMounted = false;
-      clearInterval(gpsCheckInterval);
     };
   }, []);
 
@@ -124,24 +119,29 @@ export const RoadmapScreen = ({ navigation }: any) => {
     return activeInTransitOrder || null;
   }, [focusedOrderId, activeInTransitOrder, sortedOrders]);
 
-  // Calcular waypoints de la ruta ÚNICAMENTE cuando un pedido ha sido tocado/seleccionado o está EN TRÁNSITO
+  // Calcular waypoints de la ruta anidada (La "Serpiente" que conecta todas las paradas en orden)
   const waypointCoordinates = useMemo(() => {
-    if (!selectedOrActiveOrder || selectedOrActiveOrder.latitude === null || selectedOrActiveOrder.longitude === null) {
+    // Si estamos viendo el detalle de un pedido finalizado (aprobado/observado), NO mostrar la serpiente general
+    if (orderToDisplay && ([ORDER_STATUS.DELIVERED, ORDER_STATUS.OBSERVED, ORDER_STATUS.FAILED] as string[]).includes(orderToDisplay.status)) {
       return [];
     }
 
     const points: LatLng[] = [];
 
-    // 1. Agregar ubicación actual del conductor si el GPS está activo
+    // 1. Agregar ubicación actual del conductor si el GPS está activo (Punto de Partida)
     if (lastKnownLocation && lastKnownLocation.latitude !== null && lastKnownLocation.longitude !== null) {
       points.push({ latitude: lastKnownLocation.latitude, longitude: lastKnownLocation.longitude });
     }
 
-    // 2. Coordenada del pedido objetivo
-    points.push({ latitude: selectedOrActiveOrder.latitude, longitude: selectedOrActiveOrder.longitude });
+    // 2. Anidar TODOS los pedidos pendientes en el orden exacto en el que deben ser visitados (sequenceIndex)
+    pendingOrders.forEach((o) => {
+      if (o.latitude !== null && o.longitude !== null) {
+        points.push({ latitude: o.latitude, longitude: o.longitude });
+      }
+    });
 
     return points;
-  }, [selectedOrActiveOrder, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
+  }, [pendingOrders, lastKnownLocation?.latitude, lastKnownLocation?.longitude, orderToDisplay?.status]);
 
   useEffect(() => {
     let isMounted = true;

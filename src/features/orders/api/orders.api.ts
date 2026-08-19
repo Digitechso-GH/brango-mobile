@@ -4,7 +4,7 @@ import { apiClient } from "../../../shared/api/client";
 import { API_ENDPOINTS } from "../../../shared/config/env";
 import { mapStatusFromBackend, mapStatusToBackend } from "../constants/order-status";
 import { Order } from "../types/orders.types";
-import { RouteAssignmentSchema, OrderSchema } from "../types/orders.schemas";
+import { RouteAssignmentSchema, OrderSchema, PaginatedOrdersResponseSchema } from "../types/orders.schemas";
 import { z } from "zod";
 
 export type { Order };
@@ -17,26 +17,20 @@ const parseNumberCoordinate = (val: any): number | null => {
 
 export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> => {
   try {
-    const params: any = { todayOnly: true };
+    const params: any = {};
     if (driverId && driverId.trim() !== "") {
       params.driverId = driverId.trim();
     }
 
-    const res = await apiClient.get(API_ENDPOINTS.ORDERS, { params });
-    const rawData = res.data;
-    const backendOrders = Array.isArray(rawData)
-      ? rawData
-      : Array.isArray(rawData?.data)
-      ? rawData.data
-      : [];
+    const res = await apiClient.get(`${API_ENDPOINTS.ORDERS}/today`, { params });
+    
+    // 1. Validar estrictamente la estructura { data, meta }
+    // El backend globalmente envuelve todo en { success: true, data: {...} }
+    const payload = res.data.success !== undefined ? res.data.data : res.data;
+    const parsedResponse = PaginatedOrdersResponseSchema.parse(payload);
+    const backendOrders = parsedResponse.data;
 
     return backendOrders.map((o: any): Order => {
-      // 1. Validar estrictamente los datos que provienen del Backend usando Zod
-      OrderSchema.parse(o);
-      if (o.assignments) {
-        z.array(RouteAssignmentSchema).parse(o.assignments);
-      }
-
       const assignment = o.assignments?.[0];
       const routeAssignmentId = assignment ? String(assignment.id) : String(o.id);
       
@@ -142,6 +136,7 @@ export const uploadEvidencePhoto = async (
     // 1. Obtener Presigned URL del backend
     const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
       key: `evidence-${Date.now()}-${filename}`,
+      contentType: contentType,
     });
     
     const presignedData = presignedRes.data?.data || presignedRes.data || presignedRes;
@@ -151,22 +146,28 @@ export const uploadEvidencePhoto = async (
       throw new Error("No se pudo obtener la URL de subida de Cloudflare R2");
     }
 
-    // 2. Preparar el binario
-    const response = await fetch(photoUri);
-    const fileBody = await response.blob();
-
-    // 3. Subir el archivo físico directamente a Cloudflare R2
-    const r2Response = await fetch(uploadUrl, {
-      method: "PUT",
-      body: fileBody,
-      headers: {
-        "Content-Type": contentType,
-      },
+    // 2. Subir el archivo físico directamente a Cloudflare R2 usando XMLHttpRequest nativo
+    // Esto evita el error "Network request failed" de fetch() y las advertencias legacy de Expo 54
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", contentType);
+      
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          resolve(true);
+        } else {
+          reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new Error("Network request failed during XMLHttpRequest upload"));
+      };
+      
+      // En React Native, XHR soporta enviar un objeto con { uri, type, name } directamente
+      xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
     });
-
-    if (!r2Response.ok) {
-      throw new Error(`Error subiendo foto a R2: ${r2Response.statusText}`);
-    }
 
     // 4. Registrar la URL en el backend
     const evidenceBody: any = { s3Url: publicUrl };

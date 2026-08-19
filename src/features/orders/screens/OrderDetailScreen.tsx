@@ -18,7 +18,6 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
   const [observationNote, setObservationNote] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [isObserving, setIsObserving] = useState<boolean>(false);
-  const [showGpsModal, setShowGpsModal] = useState(false);
   const [errorModal, setErrorModal] = useState({ visible: false, message: "" });
   const lastKnownLocation = useTrackingStore((state) => state.lastKnownLocation);
 
@@ -129,7 +128,6 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     try {
       const isGpsReady = await ensureGpsEnabled();
       if (!isGpsReady) {
-        setShowGpsModal(true);
         setIsConfirming(false);
         return;
       }
@@ -188,7 +186,6 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     try {
       const isGpsReady = await ensureGpsEnabled();
       if (!isGpsReady) {
-        setShowGpsModal(true);
         setIsObserving(false);
         return;
       }
@@ -383,19 +380,6 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           </View>
         </FooterActionContainer>
       )}
-
-      <AppModal
-        visible={showGpsModal}
-        title="GPS no disponible"
-        message="Activa el GPS de tu dispositivo o permite el acceso a tu ubicación para registrar el inicio del recorrido."
-        icon="📍"
-        buttonTitle="Abrir Configuración"
-        onConfirm={() => {
-          setShowGpsModal(false);
-          Linking.openSettings();
-        }}
-        onCancel={() => setShowGpsModal(false)}
-      />
 
       <AppModal
         visible={errorModal.visible}
