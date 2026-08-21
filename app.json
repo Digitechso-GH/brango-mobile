@@ -30,6 +30,11 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.jsm788steam.brangomobile"
@@ -44,6 +49,12 @@
       "eas": {
         "projectId": "08aa3173-1e50-4a48-b7dc-61690d65273f"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/08aa3173-1e50-4a48-b7dc-61690d65273f"
     }
   }
 }

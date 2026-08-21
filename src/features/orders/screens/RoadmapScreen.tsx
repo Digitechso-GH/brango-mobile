@@ -275,12 +275,27 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const handleFocusOrder = (order: Order) => {
     if (order.latitude !== null && order.longitude !== null) {
       setFocusedOrderId(order.id);
-      setSelectedRegion({
-        latitude: order.latitude,
-        longitude: order.longitude,
-        latitudeDelta: 0.015,
-        longitudeDelta: 0.015,
-      });
+      
+      if (lastKnownLocation && lastKnownLocation.latitude !== null && lastKnownLocation.longitude !== null) {
+        const minLat = Math.min(lastKnownLocation.latitude, order.latitude);
+        const maxLat = Math.max(lastKnownLocation.latitude, order.latitude);
+        const minLng = Math.min(lastKnownLocation.longitude, order.longitude);
+        const maxLng = Math.max(lastKnownLocation.longitude, order.longitude);
+        
+        setSelectedRegion({
+          latitude: (minLat + maxLat) / 2,
+          longitude: (minLng + maxLng) / 2,
+          latitudeDelta: Math.max((maxLat - minLat) * 1.5, 0.02),
+          longitudeDelta: Math.max((maxLng - minLng) * 1.5, 0.02),
+        });
+      } else {
+        setSelectedRegion({
+          latitude: order.latitude,
+          longitude: order.longitude,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        });
+      }
     } else {
       Alert.alert("Ubicación no disponible", "Este pedido no cuenta con coordenadas de mapa válidas.");
     }
