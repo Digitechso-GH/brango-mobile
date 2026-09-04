@@ -104,4 +104,18 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
+  backToRoutesBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 4,
+  },
+  backToRoutesText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.primary,
+  },
 });

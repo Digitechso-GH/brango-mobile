@@ -1,8 +1,8 @@
 import { Platform } from "react-native";
 import axios from "axios";
 import { apiClient } from "../../../shared/api/client";
-import { API_ENDPOINTS } from "../../../shared/config/env";
-import { mapStatusFromBackend, mapStatusToBackend } from "../constants/order-status";
+import { API_ENDPOINTS } from "../../../shared/constants/routes";
+import { mapStatusFromBackend, mapStatusToBackend, ORDER_STATUS } from "../constants/order-status";
 import { Order } from "../types/orders.types";
 import { RouteAssignmentSchema, OrderSchema, PaginatedOrdersResponseSchema } from "../types/orders.schemas";
 import { z } from "zod";
@@ -15,6 +15,15 @@ const parseNumberCoordinate = (val: any): number | null => {
   return isNaN(num) ? null : num;
 };
 
+export const completeRoute = async (routeId: string): Promise<void> => {
+  try {
+    await apiClient.post(`${API_ENDPOINTS.ROUTES.BASE}/${routeId}/complete`);
+  } catch (error: any) {
+    console.error("Error al completar la ruta:", error);
+    throw error.response?.data || error;
+  }
+};
+
 export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> => {
   try {
     const params: any = {};
@@ -23,7 +32,7 @@ export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> =
     }
 
     const res = await apiClient.get(`${API_ENDPOINTS.ORDERS}/today`, { params });
-    
+
     // 1. Validar estrictamente la estructura { data, meta }
     // El backend globalmente envuelve todo en { success: true, data: {...} }
     const payload = res.data.success !== undefined ? res.data.data : res.data;
@@ -33,9 +42,9 @@ export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> =
     return backendOrders.map((o: any): Order => {
       const assignment = o.assignments?.[0];
       const routeAssignmentId = assignment ? String(assignment.id) : String(o.id);
-      
-      const rawEvidence = assignment && assignment.evidences && assignment.evidences.length > 0 
-        ? assignment.evidences[0].s3Url 
+
+      const rawEvidence = assignment && assignment.evidences && assignment.evidences.length > 0
+        ? assignment.evidences[0].s3Url
         : "";
 
       const displayAddress = o.formattedAddress || o.rawAddress || "—";
@@ -53,9 +62,9 @@ export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> =
         address: displayAddress,
         rawAddress: o.rawAddress || "",
         formattedAddress: o.formattedAddress || null,
-        status: assignment ? mapStatusFromBackend(assignment.status) : "PENDING",
-        rawState: assignment ? assignment.status : "PENDING",
-        reasonText: assignment?.status === "OBSERVED" ? assignment?.reasonText || null : null,
+        status: assignment ? mapStatusFromBackend(assignment.status) : ORDER_STATUS.PENDING,
+        rawState: assignment ? assignment.status : ORDER_STATUS.PENDING,
+        reasonText: assignment?.status === ORDER_STATUS.OBSERVED ? assignment?.reasonText || null : null,
         latitude: parseNumberCoordinate(o.latitude),
         longitude: parseNumberCoordinate(o.longitude),
         originText: assignment?.originAddress || null,
@@ -64,6 +73,7 @@ export const fetchAssignedOrders = async (driverId?: string): Promise<Order[]> =
         evidenceUrl: rawEvidence,
         updatedAt: assignment?.updatedAt ?? o.updatedAt,
         sequenceIndex: assignment ? assignment.sequenceIndex : 0,
+        stopGroupId: assignment?.stopGroupId || null,
       };
     });
   } catch (error: any) {
@@ -138,7 +148,7 @@ export const uploadEvidencePhoto = async (
       key: `evidence-${Date.now()}-${filename}`,
       contentType: contentType,
     });
-    
+
     const presignedData = presignedRes.data?.data || presignedRes.data || presignedRes;
     const { uploadUrl, publicUrl } = presignedData;
 
@@ -152,7 +162,7 @@ export const uploadEvidencePhoto = async (
       const xhr = new XMLHttpRequest();
       xhr.open("PUT", uploadUrl);
       xhr.setRequestHeader("Content-Type", contentType);
-      
+
       xhr.onload = () => {
         if (xhr.status === 200) {
           resolve(true);
@@ -160,11 +170,11 @@ export const uploadEvidencePhoto = async (
           reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
         }
       };
-      
+
       xhr.onerror = () => {
         reject(new Error("Network request failed during XMLHttpRequest upload"));
       };
-      
+
       // En React Native, XHR soporta enviar un objeto con { uri, type, name } directamente
       xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
     });
@@ -187,6 +197,64 @@ export const uploadEvidencePhoto = async (
     return publicUrl;
   } catch (error: any) {
     console.error("Error uploading evidence photo:", error.message);
+    throw error;
+  }
+};
+
+export const uploadGroupEvidencePhoto = async (
+  routeAssignmentIds: string[],
+  photoUri: string,
+  signatureText?: string
+): Promise<string> => {
+  try {
+    const filename = photoUri.split("/").pop() || `evidence_${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const contentType = match ? `image/${match[1]}` : "image/jpeg";
+
+    // 1. Obtener Presigned URL del backend (1 sola llamada a R2)
+    const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
+      key: `evidence-${Date.now()}-${filename}`,
+      contentType: contentType,
+    });
+
+    const presignedData = presignedRes.data?.data || presignedRes.data || presignedRes;
+    const { uploadUrl, publicUrl } = presignedData;
+
+    if (!uploadUrl || !publicUrl) {
+      throw new Error("No se pudo obtener la URL de subida de Cloudflare R2");
+    }
+
+    // 2. Subir el archivo físico a Cloudflare R2 usando XMLHttpRequest nativo
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", contentType);
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          resolve(true);
+        } else {
+          reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Network request failed during XMLHttpRequest upload"));
+      };
+
+      xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
+    });
+
+    // 3. Registrar la misma URL en todas las filas de Evidence de las asignaciones consolidadas
+    await apiClient.post(`${API_ENDPOINTS.ORDERS}/group-evidence`, {
+      assignmentIds: routeAssignmentIds,
+      s3Url: publicUrl,
+      signatureText: signatureText || undefined,
+    });
+
+    return publicUrl;
+  } catch (error: any) {
+    console.error("Error uploading group evidence photo:", error.message);
     throw error;
   }
 };

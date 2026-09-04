@@ -12,7 +12,7 @@ export interface LoginResponse {
     id: string;
     name: string;
     email: string;
-    rol: string;
+    role: string;
     unit?: string;
     driverId: string;
   };

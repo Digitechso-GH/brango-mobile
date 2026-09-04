@@ -17,13 +17,7 @@ if (!resolvedUrl) {
 
 export const API_URL = resolvedUrl;
 
-export const API_ENDPOINTS = {
-  ORDERS: "/orders",
-  AUTH: {
-    LOGIN: "/auth/login",
-    REFRESH: "/auth/refresh",
-  },
-} as const;
+
 
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 

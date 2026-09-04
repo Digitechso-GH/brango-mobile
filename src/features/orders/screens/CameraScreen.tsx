@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Image, Platform, ActivityIndi
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 export const CameraScreen = ({ route, navigation }: any) => {
-  const { orderId } = route.params;
+  const { orderId, order } = route.params;
   const [photo, setPhoto] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
@@ -58,7 +58,7 @@ export const CameraScreen = ({ route, navigation }: any) => {
 
   const handleSaveEvidence = () => {
     if (!photo) return;
-    navigation.navigate("OrderDetail", { orderId, photo });
+    navigation.navigate("OrderDetail", { orderId, photo, order });
   };
 
   const handleClose = () => {

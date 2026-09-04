@@ -7,11 +7,13 @@ import { OrderDetailScreen } from "../features/orders/screens/OrderDetailScreen"
 import { CameraScreen } from "../features/orders/screens/CameraScreen";
 import { SuccessScreen } from "../features/orders/screens/SuccessScreen";
 
+import { Order } from "../features/orders/types/orders.types";
+
 export type RootStackParamList = {
   Login: undefined;
   Roadmap: undefined;
-  OrderDetail: { orderId: string; photo?: string };
-  Camera: { orderId: string };
+  OrderDetail: { orderId: string; photo?: string; order?: Order };
+  Camera: { orderId: string; order?: Order };
   Success: { orderId: string; client: string; guia?: string; isObserved?: boolean; note?: string };
 };
 

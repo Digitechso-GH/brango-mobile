@@ -41,35 +41,32 @@ export const GpsWarningBanner = () => {
       return;
     }
 
-      // 1. Activar el servicio de ubicación (Antena GPS)
-      let hasServices = await Location.hasServicesEnabledAsync();
-      if (!hasServices && Platform.OS === "android") {
-        try {
-          await Location.enableNetworkProviderAsync();
-          hasServices = await Location.hasServicesEnabledAsync();
-        } catch (e) {
-          console.log("El usuario canceló encender el GPS");
-        }
-      }
-
-      if (!hasServices) {
-        // Si sigue sin servicios, lo mandamos a los ajustes generales de ubicación
-        if (Platform.OS === "android") {
-          await Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS");
-        }
+    // 1. Activar el servicio de ubicación (Antena GPS)
+    let hasServices = await Location.hasServicesEnabledAsync();
+    if (!hasServices && Platform.OS === "android") {
+      try {
+        await Location.enableNetworkProviderAsync();
+        hasServices = await Location.hasServicesEnabledAsync();
+      } catch (e) {
+        console.log("El usuario canceló encender el GPS");
         return;
       }
+    }
 
-      // 2. Solicitar permisos de primer plano
-      const permissionResponse = await Location.requestForegroundPermissionsAsync();
-      
-      if (permissionResponse.status === "granted") {
-        setIsGpsDisabled(false);
-      } else if (!permissionResponse.canAskAgain) {
-        // El usuario le dio a "No volver a preguntar"
-        window.alert("Debes habilitar los permisos de ubicación manualmente en las opciones de la aplicación.");
-        await Linking.openSettings();
-      }
+    if (!hasServices) {
+      return;
+    }
+
+    // 2. Solicitar permisos de primer plano
+    const permissionResponse = await Location.requestForegroundPermissionsAsync();
+
+    if (permissionResponse.status === "granted") {
+      setIsGpsDisabled(false);
+    } else if (!permissionResponse.canAskAgain) {
+      // El usuario le dio a "No volver a preguntar"
+      window.alert("Debes habilitar los permisos de ubicación manualmente en las opciones de la aplicación.");
+      await Linking.openSettings();
+    }
   };
 
   if (!isGpsDisabled) return null;

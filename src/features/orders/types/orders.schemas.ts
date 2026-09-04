@@ -8,11 +8,11 @@ export const PaginationMetaSchema = z.object({
 });
 
 export const OrderSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string(),
   code: z.string(),
   waybill: z.string().nullable().optional(),
-  recipientCustomerType: z.enum(["COMPANY", "INDIVIDUAL"]),
-  recipientDocument: z.string(),
+  recipientCustomerType: z.enum(["COMPANY", "INDIVIDUAL"]).nullable().optional(),
+  recipientDocument: z.string().nullable().optional(),
   recipientName: z.string().nullable().optional(),
   recipientPhone: z.string().nullable().optional(),
   recipientEmail: z.string().nullable().optional(),
@@ -21,7 +21,7 @@ export const OrderSchema = z.object({
   formattedAddress: z.string().nullable().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
-  geocodingStatus: z.string(),
+  geocodingStatus: z.string().nullable().optional(),
   originBranchId: z.string().nullable().optional(),
   customerId: z.string().nullable().optional(),
   createdAt: z.string().or(z.date()),
@@ -29,13 +29,14 @@ export const OrderSchema = z.object({
 });
 
 export const RouteAssignmentSchema = z.object({
-  id: z.string().uuid(),
-  orderId: z.string().uuid(),
+  id: z.string(),
+  orderId: z.string().optional(),
   order: OrderSchema.optional(),
-  driverId: z.string().uuid(),
+  driverId: z.string().optional(),
   vehicleId: z.string().nullable().optional(),
   date: z.string().or(z.date()),
-  sequenceIndex: z.number(),
+  sequenceIndex: z.number().optional(),
+  stopGroupId: z.string().nullable().optional(),
   status: z.enum(["PENDING", "IN_TRANSIT", "DELIVERED", "OBSERVED"]),
   reasonText: z.string().nullable().optional(),
   previousAssignmentId: z.string().nullable().optional(),

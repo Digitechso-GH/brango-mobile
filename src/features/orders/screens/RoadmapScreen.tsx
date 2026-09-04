@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { View, Text, FlatList, ActivityIndicator, Alert, Platform, TouchableOpacity, Linking } from "react-native";
 import * as Location from "expo-location";
 import { useOrders } from "../hooks/useOrders";
@@ -9,14 +9,72 @@ import { gpsSensorService } from "../../tracking/services/gps-sensor.service";
 import { MapViewWrapper } from "../../tracking/components/MapViewWrapper";
 import { GpsWarningBanner } from "../../tracking/components/GpsWarningBanner";
 import { LatLng, getFullStreetPath } from "../../tracking/services/directions.service";
-import { OrderCard } from "../components/OrderCard";
-import { updateOrderStatus, reorderAssignments } from "../api/orders.api";
-import { ORDER_STATUS } from "../constants/order-status";
+import { OrderCard, RouteCard, RouteGroup } from "../components/OrderCard";
+import { updateOrderStatus, reorderAssignments, completeRoute } from "../api/orders.api";
+import { ORDER_STATUS, mapStatusFromBackend } from "../constants/order-status";
 import { FooterActionContainer } from "../../../shared/components/ui/FooterActionContainer";
 import { PrimaryButton } from "../../../shared/components/ui/PrimaryButton";
 import { AppModal } from "../../../shared/components/ui/AppModal";
 import { Order } from "../types/orders.types";
 import { styles } from "./RoadmapScreen.styles";
+import { apiClient } from "../../../shared/api/client";
+import { API_ENDPOINTS } from "../../../shared/constants/routes";
+
+function consolidateOrdersIntoStops(rawOrders: Order[]): Order[] {
+  const groupsMap = new Map<string, Order[]>();
+  const nonGrouped: Order[] = [];
+
+  for (const o of rawOrders) {
+    if (o.stopGroupId) {
+      if (!groupsMap.has(o.stopGroupId)) {
+        groupsMap.set(o.stopGroupId, []);
+      }
+      groupsMap.get(o.stopGroupId)!.push(o);
+    } else {
+      nonGrouped.push(o);
+    }
+  }
+
+  const stops: Order[] = [];
+
+  for (const [groupId, items] of groupsMap.entries()) {
+    const first = items[0];
+    const anyInTransit = items.some((i) => i.status === ORDER_STATUS.IN_TRANSIT);
+    const allDelivered = items.every((i) => i.status === ORDER_STATUS.DELIVERED);
+    const anyObserved = items.some(
+      (i) => i.status === ORDER_STATUS.OBSERVED || i.status === ORDER_STATUS.FAILED
+    );
+
+    let status = first.status;
+    if (anyInTransit) {
+      status = ORDER_STATUS.IN_TRANSIT;
+    } else if (allDelivered) {
+      status = ORDER_STATUS.DELIVERED;
+    } else if (anyObserved) {
+      status = ORDER_STATUS.OBSERVED;
+    }
+
+    stops.push({
+      ...first,
+      id: first.id,
+      stopGroupId: groupId,
+      groupedOrders: items,
+      code: items.map((i) => i.code).join(", "),
+      waybill: items.map((i) => i.waybill).filter(Boolean).join(", "),
+      status,
+      sequenceIndex: Math.min(...items.map((i) => i.sequenceIndex ?? 0)),
+    });
+  }
+
+  for (const o of nonGrouped) {
+    stops.push({
+      ...o,
+      groupedOrders: [o],
+    });
+  }
+
+  return stops.sort((a, b) => (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0));
+}
 
 export const RoadmapScreen = ({ navigation }: any) => {
   const { orders, isLoading, refetch } = useOrders();
@@ -24,6 +82,8 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const logout = useAuthStore((state) => state.logout);
   const lastKnownLocation = useTrackingStore((state) => state.lastKnownLocation);
   const driverId = user?.driverId || "";
+
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   const [selectedRegion, setSelectedRegion] = useState<{
     latitude: number;
@@ -42,20 +102,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const [errorModal, setErrorModal] = useState({ visible: false, message: "" });
   const [isStartingRoute, setIsStartingRoute] = useState(false);
 
-  // Escuchar asignación de nuevos pedidos por Socket en tiempo real
-  useEffect(() => {
-    const socket = trackingService.getSocket();
-    if (!socket) return;
 
-    const handleOrderAssigned = () => {
-      refetch();
-    };
-
-    socket.on("order_assigned", handleOrderAssigned);
-    return () => {
-      socket.off("order_assigned", handleOrderAssigned);
-    };
-  }, [refetch]);
 
   // Actualizar posición GPS local y sincronizar intervalo al montar la pantalla
   useEffect(() => {
@@ -102,26 +149,222 @@ export const RoadmapScreen = ({ navigation }: any) => {
 
   const sortedOrders = useMemo(() => [...pendingOrders, ...deliveredOrders], [pendingOrders, deliveredOrders]);
 
-  const activeInTransitOrder = orders.find((o) => o.status === ORDER_STATUS.IN_TRANSIT);
-  const nextPendingOrder = pendingOrders.find((o) => o.status === ORDER_STATUS.PENDING);
-  const targetOrder = activeInTransitOrder || nextPendingOrder;
+  const [realBackendRoutes, setRealBackendRoutes] = useState<RouteGroup[]>([]);
+  const [isLoadingBackendRoutes, setIsLoadingBackendRoutes] = useState(false);
+
+  const parseNumberCoordinate = (val: any): number | null => {
+    if (val === null || val === undefined || val === "") return null;
+    const num = typeof val === "number" ? val : parseFloat(val);
+    return isNaN(num) ? null : num;
+  };
+
+  const fetchRealRoutes = useCallback(async () => {
+    try {
+      setIsLoadingBackendRoutes(true);
+      const res = await apiClient.get(API_ENDPOINTS.ROUTES.MOBILE);
+      const payload = res.data?.success !== undefined ? res.data.data : res.data;
+      
+      if (!Array.isArray(payload)) {
+        setRealBackendRoutes([]);
+        return;
+      }
+
+      // Mostrar todas las rutas de la jornada del día (pendientes, en progreso y completadas)
+      const groups: RouteGroup[] = payload.map((r: any): RouteGroup => {
+        const activeAssignments = (r.assignments || []).filter((a: any) => !a.voidedAt);
+        const mappedOrders: Order[] = activeAssignments.map((a: any) => {
+          const o = a.order || {};
+          const routeAssignmentId = String(a.id);
+          const displayAddress = o.formattedAddress || o.rawAddress || "—";
+          const displayClient = (o.customer?.name || o.recipientName || "—").trim();
+
+          const rawEvidence = a.evidences && a.evidences.length > 0 
+            ? a.evidences[0].s3Url 
+            : (o.evidences && o.evidences.length > 0 ? o.evidences[0].s3Url : "");
+
+          return {
+            id: routeAssignmentId,
+            code: o.code || "",
+            waybill: o.waybill || "",
+            client: displayClient,
+            recipientName: o.recipientName || "",
+            recipientDoc: o.recipientDocument || "",
+            recipientPhone: o.recipientPhone || "",
+            warehouseContact: o.warehouseContact || "",
+            address: displayAddress,
+            rawAddress: o.rawAddress || "",
+            formattedAddress: o.formattedAddress || null,
+            status: mapStatusFromBackend(a.status),
+            rawState: a.status,
+            reasonText: a.status === "OBSERVED" ? a.reasonText || null : null,
+            latitude: parseNumberCoordinate(o.latitude),
+            longitude: parseNumberCoordinate(o.longitude),
+            originText: a.originAddress || null,
+            originLatitude: parseNumberCoordinate(a.originLatitude),
+            originLongitude: parseNumberCoordinate(a.originLongitude),
+            evidenceUrl: rawEvidence,
+            updatedAt: a.updatedAt ?? o.updatedAt,
+            sequenceIndex: a.sequenceIndex ?? 0,
+            stopGroupId: a.stopGroupId || null,
+          };
+        });
+
+        const total = mappedOrders.length;
+        const pendingCount = mappedOrders.filter(
+          (o) => o.status === ORDER_STATUS.PENDING || o.status === ORDER_STATUS.IN_TRANSIT
+        ).length;
+        const completedCount = mappedOrders.filter((o) => o.status === ORDER_STATUS.DELIVERED).length;
+        const observedCount = mappedOrders.filter(
+          (o) => o.status === ORDER_STATUS.OBSERVED || o.status === ORDER_STATUS.FAILED
+        ).length;
+
+        const hasInTransit = mappedOrders.some((o) => o.status === ORDER_STATUS.IN_TRANSIT);
+        const isCompleted = r.status === "COMPLETED" || (total > 0 && pendingCount === 0 && observedCount === 0);
+
+        const routeStatus = hasInTransit
+          ? "IN_TRANSIT"
+          : isCompleted
+          ? "COMPLETED"
+          : "PENDING";
+
+        return {
+          id: String(r.id),
+          name: r.name || `Ruta #${r.sequenceIndex || 1}`,
+          status: routeStatus,
+          date: r.date,
+          orders: mappedOrders,
+          totalOrders: total,
+          pendingOrders: pendingCount,
+          completedOrders: completedCount,
+          observedOrders: observedCount,
+        };
+      });
+
+      setRealBackendRoutes(groups);
+    } catch (err) {
+      console.log("Error al consultar rutas reales del chofer desde el servidor:", err);
+      setRealBackendRoutes([]);
+    } finally {
+      setIsLoadingBackendRoutes(false);
+    }
+  }, []);
+
+  // Escuchar asignación de nuevos pedidos por Socket en tiempo real
+  useEffect(() => {
+    const socket = trackingService.getSocket();
+    if (!socket) return;
+
+    const handleOrderAssigned = () => {
+      refetch();
+      fetchRealRoutes(); // <--- Fuerza el refresco de las rutas reales inmediatamente
+    };
+
+    socket.on("order_assigned", handleOrderAssigned);
+    return () => {
+      socket.off("order_assigned", handleOrderAssigned);
+    };
+  }, [refetch, fetchRealRoutes]);
+
+  useEffect(() => {
+    fetchRealRoutes();
+  }, [fetchRealRoutes, orders]);
+
+  const routeGroups = realBackendRoutes;
+
+  const selectedRoute = useMemo(() => {
+    if (!selectedRouteId) return null;
+    return routeGroups.find((r) => r.id === selectedRouteId) || null;
+  }, [routeGroups, selectedRouteId]);
+
+  const activeOrdersForView = useMemo(() => {
+    const raw = selectedRoute ? selectedRoute.orders : sortedOrders;
+    return consolidateOrdersIntoStops(raw);
+  }, [selectedRoute, sortedOrders]);
+
+  // Pedidos activos/pendientes acotados a la ruta seleccionada (o a todos si está en vista general)
+  const currentRoutePendingOrders = useMemo(() => {
+    return activeOrdersForView.filter(
+      (o) => o.status === ORDER_STATUS.PENDING || o.status === ORDER_STATUS.IN_TRANSIT
+    );
+  }, [activeOrdersForView]);
+
+  const currentRouteInTransitOrder = useMemo(() => {
+    if (selectedRoute) {
+      return selectedRoute.orders.find((o) => o.status === ORDER_STATUS.IN_TRANSIT) || null;
+    }
+    return orders.find((o) => o.status === ORDER_STATUS.IN_TRANSIT) || null;
+  }, [selectedRoute, orders]);
+
+  const currentRouteNextPendingOrder = useMemo(() => {
+    return currentRoutePendingOrders.find((o) => o.status === ORDER_STATUS.PENDING) || null;
+  }, [currentRoutePendingOrders]);
+
+  const targetOrder = currentRouteInTransitOrder || currentRouteNextPendingOrder;
+
+  const isCurrentRouteCompleted = useMemo(() => {
+    if (!selectedRoute) return false;
+    if (selectedRoute.status === "COMPLETED") return true;
+    return selectedRoute.orders.length > 0 && currentRoutePendingOrders.length === 0;
+  }, [selectedRoute, currentRoutePendingOrders]);
+
+  const isSelectedRouteForToday = useMemo(() => {
+    if (!selectedRoute || !selectedRoute.date) return false;
+    
+    // Obtener la fecha actual artificialmente centrada en America/Lima (UTC-5 fijo)
+    const nowUTC = Date.now();
+    const limaOffsetMs = -5 * 60 * 60 * 1000;
+    const limaTime = new Date(nowUTC + limaOffsetMs);
+    const todayLimaStr = limaTime.toISOString().split('T')[0]; // ej: "2026-09-03"
+
+    // La fecha de la ruta desde backend (ej: "2026-09-03T05:00:00.000Z")
+    const routeDateStr = selectedRoute.date.split('T')[0];
+
+    return todayLimaStr === routeDateStr;
+  }, [selectedRoute]);
 
   const [streetRouteCoordinates, setStreetRouteCoordinates] = useState<LatLng[]>([]);
 
   // Marcador enfocado
-  const orderToDisplay = focusedOrderId ? (sortedOrders.find((o) => o.id === focusedOrderId) || null) : null;
+  const orderToDisplay = focusedOrderId
+    ? (activeOrdersForView.find((o) => o.id === focusedOrderId) || null)
+    : null;
 
-  // Determinar el pedido seleccionado por el chofer o el pedido en tránsito activo
-  const selectedOrActiveOrder = useMemo(() => {
-    if (focusedOrderId) {
-      return sortedOrders.find((o) => o.id === focusedOrderId) || null;
+  // Centrar mapa al seleccionar una ruta
+  useEffect(() => {
+    if (selectedRoute && selectedRoute.orders.length > 0) {
+      const ordersWithCoords = selectedRoute.orders.filter(
+        (o) => o.latitude !== null && o.longitude !== null
+      );
+      if (ordersWithCoords.length > 0) {
+        const allLats = ordersWithCoords.map((o) => o.latitude!);
+        const allLngs = ordersWithCoords.map((o) => o.longitude!);
+        if (lastKnownLocation?.latitude && lastKnownLocation?.longitude) {
+          allLats.push(lastKnownLocation.latitude);
+          allLngs.push(lastKnownLocation.longitude);
+        }
+        const minLat = Math.min(...allLats);
+        const maxLat = Math.max(...allLats);
+        const minLng = Math.min(...allLngs);
+        const maxLng = Math.max(...allLngs);
+
+        setSelectedRegion({
+          latitude: (minLat + maxLat) / 2,
+          longitude: (minLng + maxLng) / 2,
+          latitudeDelta: Math.max((maxLat - minLat) * 1.5, 0.03),
+          longitudeDelta: Math.max((maxLng - minLng) * 1.5, 0.03),
+        });
+      }
     }
-    return activeInTransitOrder || null;
-  }, [focusedOrderId, activeInTransitOrder, sortedOrders]);
+  }, [selectedRouteId, selectedRoute, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
 
-  // Calcular waypoints de la ruta anidada (La "Serpiente" que conecta todas las paradas en orden)
+  // Calcular waypoints de la ruta (La "Serpiente" que conecta las paradas en orden)
   const waypointCoordinates = useMemo(() => {
-    // Si estamos viendo el detalle de un pedido finalizado (aprobado/observado), NO mostrar la serpiente general
+    // Si la ruta está completada o no hay pedidos pendientes, NO dibujar serpiente
+    if (isCurrentRouteCompleted || currentRoutePendingOrders.length === 0) {
+      return [];
+    }
+
+    // Si estamos viendo el detalle de un pedido finalizado (aprobado/observado), NO mostrar serpiente
     if (orderToDisplay && ([ORDER_STATUS.DELIVERED, ORDER_STATUS.OBSERVED, ORDER_STATUS.FAILED] as string[]).includes(orderToDisplay.status)) {
       return [];
     }
@@ -133,15 +376,15 @@ export const RoadmapScreen = ({ navigation }: any) => {
       points.push({ latitude: lastKnownLocation.latitude, longitude: lastKnownLocation.longitude });
     }
 
-    // 2. Anidar TODOS los pedidos pendientes en el orden exacto en el que deben ser visitados (sequenceIndex)
-    pendingOrders.forEach((o) => {
+    // 2. Anidar los pedidos pendientes de la ruta actual
+    currentRoutePendingOrders.forEach((o) => {
       if (o.latitude !== null && o.longitude !== null) {
         points.push({ latitude: o.latitude, longitude: o.longitude });
       }
     });
 
     return points;
-  }, [pendingOrders, lastKnownLocation?.latitude, lastKnownLocation?.longitude, orderToDisplay?.status]);
+  }, [isCurrentRouteCompleted, currentRoutePendingOrders, orderToDisplay?.status, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
 
   useEffect(() => {
     let isMounted = true;
@@ -193,12 +436,21 @@ export const RoadmapScreen = ({ navigation }: any) => {
       let longitude = lastKnownLocation?.longitude ?? targetOrder.longitude ?? undefined;
 
       try {
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const currentLocation = await Promise.race([
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500))
+        ]);
         if (currentLocation && currentLocation.coords) {
           latitude = currentLocation.coords.latitude;
           longitude = currentLocation.coords.longitude;
+        } else if (latitude === undefined || longitude === undefined) {
+          const lastKnown = await Location.getLastKnownPositionAsync({});
+          if (lastKnown && lastKnown.coords) {
+            latitude = lastKnown.coords.latitude;
+            longitude = lastKnown.coords.longitude;
+          }
         }
       } catch (e) {
         console.log("No se pudo obtener posición GPS actual, usando última conocida o de pedido:", e);
@@ -210,17 +462,28 @@ export const RoadmapScreen = ({ navigation }: any) => {
         return;
       }
 
-      await updateOrderStatus({
-        orderId: targetOrder.id,
-        status: ORDER_STATUS.IN_TRANSIT,
-        latitude,
-        longitude,
-      });
+      if (targetOrder.groupedOrders && targetOrder.groupedOrders.length > 0) {
+        for (const subOrder of targetOrder.groupedOrders) {
+          await updateOrderStatus({
+            orderId: subOrder.id,
+            status: ORDER_STATUS.IN_TRANSIT,
+            latitude,
+            longitude,
+          });
+        }
+      } else {
+        await updateOrderStatus({
+          orderId: targetOrder.id,
+          status: ORDER_STATUS.IN_TRANSIT,
+          latitude,
+          longitude,
+        });
+      }
 
       setFocusedOrderId(targetOrder.id);
       await trackingService.startTracking(targetOrder.id, latitude, longitude);
 
-      await refetch();
+      await Promise.all([refetch(), fetchRealRoutes()]);
     } catch (error: any) {
       setErrorModal({ visible: true, message: error.message || "No se pudo iniciar el recorrido" });
     } finally {
@@ -228,7 +491,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
     }
   };
 
-  // Construcción de Marcadores del Mapa
+  // Construcción de Marcadores del Mapa (Filtrados estrictamente por la ruta seleccionada)
   const markers: any[] = [];
 
   // 1. Marcador del Chofer (🚚 Carrito) - Si hay GPS activo
@@ -244,32 +507,50 @@ export const RoadmapScreen = ({ navigation }: any) => {
     });
   }
 
-  // 2. Marcadores de destinos activos (Pendientes / En tránsito)
-  pendingOrders.forEach((o) => {
-    if (o.latitude !== null && o.longitude !== null) {
-      markers.push({
-        id: `dest-${o.id}`,
-        latitude: o.latitude,
-        longitude: o.longitude,
-        title: `${o.client} (Parada ${pendingOrders.indexOf(o) + 1})`,
-        description: o.address,
-        color: o.status === ORDER_STATUS.IN_TRANSIT ? "#F59E0B" : "#3D5FFF",
-      });
-    }
-  });
+  // 2. Destinos: si hay una ruta seleccionada, mostrar EXCLUSIVAMENTE los pedidos de esa ruta
+  if (selectedRoute) {
+    activeOrdersForView.forEach((o, index) => {
+      if (o.latitude !== null && o.longitude !== null) {
+        let markerColor = "#3D5FFF"; // PENDING
+        let statusLabel = `Parada ${index + 1}`;
 
-  // 3. Marcador enfocado adicional (si es entregado/observado para que aparezca)
-  if (orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING && orderToDisplay.status !== ORDER_STATUS.IN_TRANSIT) {
-    if (orderToDisplay.latitude !== null && orderToDisplay.longitude !== null) {
-      markers.push({
-        id: `dest-focused-${orderToDisplay.id}`,
-        latitude: orderToDisplay.latitude,
-        longitude: orderToDisplay.longitude,
-        title: `${orderToDisplay.client} (Entregado/Observado)`,
-        description: orderToDisplay.address,
-        color: orderToDisplay.status === ORDER_STATUS.DELIVERED ? "#10B981" : "#EF4444",
-      });
-    }
+        if (o.status === ORDER_STATUS.IN_TRANSIT) {
+          markerColor = "#F59E0B";
+          statusLabel = "En Tránsito";
+        } else if (o.status === ORDER_STATUS.DELIVERED) {
+          markerColor = "#10B981";
+          statusLabel = "Entregado";
+        } else if (o.status === ORDER_STATUS.OBSERVED || o.status === ORDER_STATUS.FAILED) {
+          markerColor = "#EF4444";
+          statusLabel = "Observado";
+        }
+
+        const groupNote = o.groupedOrders && o.groupedOrders.length > 1 ? ` · ${o.groupedOrders.length} pedidos` : "";
+
+        markers.push({
+          id: `dest-${o.id}`,
+          latitude: o.latitude,
+          longitude: o.longitude,
+          title: `${o.client} (${statusLabel}${groupNote})`,
+          description: o.address,
+          color: markerColor,
+        });
+      }
+    });
+  } else {
+    // Modo vista general de rutas: mostrar pedidos pendientes de todas las rutas
+    pendingOrders.forEach((o) => {
+      if (o.latitude !== null && o.longitude !== null) {
+        markers.push({
+          id: `dest-${o.id}`,
+          latitude: o.latitude,
+          longitude: o.longitude,
+          title: `${o.client} (Pendiente)`,
+          description: o.address,
+          color: o.status === ORDER_STATUS.IN_TRANSIT ? "#F59E0B" : "#3D5FFF",
+        });
+      }
+    });
   }
 
   const handleFocusOrder = (order: Order) => {
@@ -302,21 +583,28 @@ export const RoadmapScreen = ({ navigation }: any) => {
   };
 
   const handleSelectOrder = (orderId: string) => {
-    navigation.navigate("OrderDetail", { orderId });
+    const selectedItem =
+      activeOrdersForView.find((o) => o.id === orderId) ||
+      orders.find((o) => o.id === orderId);
+    navigation.navigate("OrderDetail", { orderId, order: selectedItem });
   };
 
   // Reordenar Prioridad Arriba
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
-    const reorderedList = [...pendingOrders];
+    const reorderedList = [...currentRoutePendingOrders];
     const temp = reorderedList[index];
     reorderedList[index] = reorderedList[index - 1];
     reorderedList[index - 1] = temp;
 
-    const ids = reorderedList.map((o) => o.id);
+    const ids = reorderedList.flatMap((stop) =>
+      stop.groupedOrders && stop.groupedOrders.length > 0
+        ? stop.groupedOrders.map((o) => o.id)
+        : [stop.id]
+    );
     try {
       await reorderAssignments(driverId, ids);
-      await refetch();
+      await Promise.all([refetch(), fetchRealRoutes()]);
     } catch (err: any) {
       Alert.alert("Error al reordenar", err.message || "Inténtalo de nuevo.");
     }
@@ -324,34 +612,64 @@ export const RoadmapScreen = ({ navigation }: any) => {
 
   // Reordenar Prioridad Abajo
   const handleMoveDown = async (index: number) => {
-    if (index === pendingOrders.length - 1) return;
-    const reorderedList = [...pendingOrders];
+    if (index === currentRoutePendingOrders.length - 1) return;
+    const reorderedList = [...currentRoutePendingOrders];
     const temp = reorderedList[index];
     reorderedList[index] = reorderedList[index + 1];
     reorderedList[index + 1] = temp;
 
-    const ids = reorderedList.map((o) => o.id);
+    const ids = reorderedList.flatMap((stop) =>
+      stop.groupedOrders && stop.groupedOrders.length > 0
+        ? stop.groupedOrders.map((o) => o.id)
+        : [stop.id]
+    );
     try {
       await reorderAssignments(driverId, ids);
-      await refetch();
+      await Promise.all([refetch(), fetchRealRoutes()]);
     } catch (err: any) {
       Alert.alert("Error al reordenar", err.message || "Inténtalo de nuevo.");
     }
   };
 
-  // Cierre de Jornada (Logout): se deshabilita si hay pedidos pendientes o en tránsito
+  const activeRoute = useMemo(() => {
+    return routeGroups.find((r) => r.status === "IN_TRANSIT" || r.status === "PENDING") || null;
+  }, [routeGroups]);
+
+  const isShiftFinalizable = useMemo(() => {
+    const routeToClose = selectedRoute || activeRoute;
+    if (!routeToClose) return false;
+    if (routeToClose.status === "COMPLETED") return false;
+    return !routeToClose.orders.some((o: Order) => o.status === ORDER_STATUS.IN_TRANSIT);
+  }, [selectedRoute, activeRoute]);
+
+  // Cierre de Jornada (Logout): Llama al endpoint de cierre por Ruta y luego desloguea
   const handleFinalizeShift = () => {
+    const routeToClose = selectedRoute || activeRoute;
+
     Alert.alert(
       "Finalizar Jornada",
-      "¿Estás seguro que deseas cerrar tu jornada y salir?",
+      "¿Estás seguro que deseas cerrar tu jornada y salir? Los pedidos pendientes de tu ruta activa pasarán a Observado.",
       [
         { text: "Cancelar", style: "cancel" },
-        { text: "Sí, Cerrar", style: "destructive", onPress: () => logout() },
+        { 
+          text: "Sí, Cerrar", 
+          style: "destructive", 
+          onPress: async () => {
+            if (routeToClose) {
+              try {
+                await completeRoute(routeToClose.id);
+                await Promise.all([refetch(), fetchRealRoutes()]);
+                Alert.alert("Jornada Finalizada", "Se ha cerrado la ruta actual correctamente.");
+              } catch (err: any) {
+                Alert.alert("Error", err.message || "No se pudo cerrar la ruta. Inténtalo de nuevo.");
+                return;
+              }
+            }
+          } 
+        },
       ]
     );
   };
-
-  const isShiftFinalizable = pendingOrders.length === 0;
 
   return (
     <View style={styles.container}>
@@ -379,36 +697,68 @@ export const RoadmapScreen = ({ navigation }: any) => {
       />
 
       <View style={styles.listContainer}>
-        {/* Cabecera: Hoja de Ruta a la izquierda, Pendientes a la derecha */}
+        {/* Cabecera dinámica: Rutas Asignadas vs Pedidos de la Ruta */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>Hoja de Ruta</Text>
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{pendingOrders.length} Pendientes</Text>
-          </View>
+          {selectedRoute ? (
+            <>
+              <TouchableOpacity
+                onPress={() => setSelectedRouteId(null)}
+                style={styles.backToRoutesBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.backToRoutesText}>← Rutas</Text>
+              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>{selectedRoute.name}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Rutas Asignadas</Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{routeGroups.length} {routeGroups.length === 1 ? "Ruta" : "Rutas"}</Text>
+              </View>
+            </>
+          )}
         </View>
 
-        {isLoading ? (
+        {isLoading || isLoadingBackendRoutes ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color="#3D5FFF" />
-            <Text style={styles.loadingText}>Cargando hoja de ruta...</Text>
+            <Text style={styles.loadingText}>Cargando información...</Text>
           </View>
-        ) : sortedOrders.length === 0 ? (
+        ) : routeGroups.length === 0 ? (
           <View style={styles.centerBox}>
             <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>Sin pedidos asignados</Text>
-            <Text style={styles.emptySubtitle}>No tienes entregas pendientes en tu hoja de ruta actualmente.</Text>
+            <Text style={styles.emptyTitle}>Sin rutas ni pedidos asignados</Text>
+            <Text style={styles.emptySubtitle}>No tienes entregas pendientes en tu jornada actualmente.</Text>
           </View>
-        ) : (
+        ) : !selectedRoute ? (
+          /* MODO 1: Cartillas de Rutas Asignadas */
           <FlatList
-            data={sortedOrders}
+            data={routeGroups}
             keyExtractor={(item) => item.id}
-            refreshing={isLoading}
-            onRefresh={refetch}
+            refreshing={isLoading || isLoadingBackendRoutes}
+            onRefresh={() => Promise.all([refetch(), fetchRealRoutes()])}
+            renderItem={({ item }) => (
+              <RouteCard
+                route={item}
+                onSelectRoute={(id) => setSelectedRouteId(id)}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          /* MODO 2: Pedidos de la Ruta Seleccionada */
+          <FlatList
+            data={activeOrdersForView}
+            keyExtractor={(item) => item.id}
+            refreshing={isLoading || isLoadingBackendRoutes}
+            onRefresh={() => Promise.all([refetch(), fetchRealRoutes()])}
             renderItem={({ item, index }) => {
-              const isLocked = activeInTransitOrder && item.id !== activeInTransitOrder.id && item.status === ORDER_STATUS.PENDING;
+              const isLocked = currentRouteInTransitOrder && item.id !== currentRouteInTransitOrder.id && item.status === ORDER_STATUS.PENDING;
               
               const isPending = item.status === ORDER_STATUS.PENDING;
-              const pendingIndex = pendingOrders.findIndex((o) => o.id === item.id);
+              const pendingIndex = currentRoutePendingOrders.findIndex((o) => o.id === item.id);
 
               return (
                 <OrderCard
@@ -422,7 +772,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
                     isPending && pendingIndex > 0 ? () => handleMoveUp(pendingIndex) : undefined
                   }
                   onMoveDown={
-                    isPending && pendingIndex < pendingOrders.length - 1
+                    isPending && pendingIndex < currentRoutePendingOrders.length - 1
                       ? () => handleMoveDown(pendingIndex)
                       : undefined
                   }
@@ -436,21 +786,51 @@ export const RoadmapScreen = ({ navigation }: any) => {
       </View>
 
       <FooterActionContainer>
-        <PrimaryButton
-          title={
-            isStartingRoute
-              ? "Iniciando Recorrido..."
-              : activeInTransitOrder
-              ? "Recorrido en Curso"
-              : !nextPendingOrder
-              ? "No hay pedidos pendientes"
-              : "Iniciar Recorrido ▶"
-          }
-          onPress={handleStartRoute}
-          isLoading={isStartingRoute}
-          disabled={!nextPendingOrder || !!activeInTransitOrder || isStartingRoute}
-          variant="primary"
-        />
+        {!selectedRoute ? (
+          <PrimaryButton
+            title="Selecciona una Ruta"
+            onPress={() => {}}
+            disabled={true}
+            variant="primary"
+          />
+        ) : isCurrentRouteCompleted ? (
+          <PrimaryButton
+            title="Ruta Finalizada ✓"
+            onPress={() => {}}
+            disabled={true}
+            variant="primary"
+          />
+        ) : !isSelectedRouteForToday ? (
+          <PrimaryButton
+            title="Programada para otro día"
+            onPress={() => {}}
+            disabled={true}
+            variant="primary"
+          />
+        ) : (
+          <PrimaryButton
+            title={
+              isStartingRoute
+                ? "Iniciando Recorrido..."
+                : currentRouteInTransitOrder
+                ? "Recorrido en Curso"
+                : orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING
+                ? "Pedido ya gestionado"
+                : !currentRouteNextPendingOrder
+                ? "No hay pedidos pendientes"
+                : "Iniciar Recorrido ▶"
+            }
+            onPress={handleStartRoute}
+            isLoading={isStartingRoute}
+            disabled={
+              isStartingRoute ||
+              !!currentRouteInTransitOrder ||
+              (!!orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING) ||
+              (!orderToDisplay && !currentRouteNextPendingOrder)
+            }
+            variant="primary"
+          />
+        )}
       </FooterActionContainer>
 
       <AppModal

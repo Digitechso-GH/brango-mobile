@@ -29,6 +29,8 @@ export interface Order {
   originSede?: SedeOrigen;
   updatedAt?: string;
   sequenceIndex?: number;
+  stopGroupId?: string | null;
+  groupedOrders?: Order[];
 }
 
 export interface OrderCardProps {

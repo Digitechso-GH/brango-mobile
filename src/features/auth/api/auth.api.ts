@@ -1,5 +1,5 @@
 import { apiClient } from "../../../shared/api/client";
-import { API_ENDPOINTS } from "../../../shared/config/env";
+import { API_ENDPOINTS } from "../../../shared/constants/routes";
 import { LoginCredentials, LoginResponse } from "../types/auth.types";
 
 export const loginApi = async (credentials: LoginCredentials): Promise<LoginResponse> => {

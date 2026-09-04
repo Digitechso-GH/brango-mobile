@@ -13,7 +13,15 @@ import { styles } from "./OrderDetailScreen.styles";
 
 export const OrderDetailScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
-  const { orders, updateStatus, uploadEvidence, isUpdatingStatus, isUploadingEvidence } = useOrders();
+  const { 
+    orders, 
+    updateStatus, 
+    uploadEvidence, 
+    uploadGroupEvidence,
+    isUpdatingStatus, 
+    isUploadingEvidence,
+    isUploadingGroupEvidence 
+  } = useOrders();
   const [photo, setPhoto] = useState<string | null>(null);
   const [observationNote, setObservationNote] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -21,9 +29,20 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
   const [errorModal, setErrorModal] = useState({ visible: false, message: "" });
   const lastKnownLocation = useTrackingStore((state) => state.lastKnownLocation);
 
-  const order = orders.find((o) => o.id === orderId);
+  const orderFromHook = orders.find((o) => o.id === orderId);
+  const rawOrder = route.params?.order || orderFromHook;
+  const groupedOrders = route.params?.order?.groupedOrders || 
+    (rawOrder?.stopGroupId ? orders.filter((o) => o.stopGroupId === rawOrder.stopGroupId) : undefined);
+  const order = rawOrder ? { ...rawOrder, groupedOrders } : null;
 
-  const isSubmitting = isConfirming || isObserving || isUpdatingStatus || isUploadingEvidence;
+  const isGroupedStop = !!(order?.groupedOrders && order.groupedOrders.length > 1);
+  const pendingInGroup = isGroupedStop
+    ? order!.groupedOrders!.filter(
+        (o: any) => o.status === ORDER_STATUS.PENDING || o.status === ORDER_STATUS.IN_TRANSIT
+      )
+    : [];
+
+  const isSubmitting = isConfirming || isObserving || isUpdatingStatus || isUploadingEvidence || isUploadingGroupEvidence;
 
   useEffect(() => {
     const onBackPress = () => {
@@ -74,7 +93,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
   const isInTransit = status === ORDER_STATUS.IN_TRANSIT;
 
   const handleTakePhoto = () => {
-    navigation.navigate("Camera", { orderId: currentOrderId });
+    navigation.navigate("Camera", { orderId: currentOrderId, order });
   };
 
   const ensureGpsEnabled = async (): Promise<boolean> => {
@@ -101,9 +120,12 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     let longitude = lastKnownLocation?.longitude ?? targetLongitude ?? undefined;
 
     try {
-      const currentLoc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const currentLoc = await Promise.race([
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500))
+      ]);
       if (currentLoc && currentLoc.coords) {
         latitude = currentLoc.coords.latitude;
         longitude = currentLoc.coords.longitude;
@@ -134,26 +156,40 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
       const { latitude, longitude } = await getDestinationCoordinates();
 
+      const targetOrders = isGroupedStop && pendingInGroup.length > 1 ? pendingInGroup : [order];
+      const targetIds = targetOrders.map((o: any) => o.id);
+
       if (photo) {
-        await uploadEvidence({
-          orderId: currentOrderId,
-          base64Image: photo,
-          signatureText: `Entregado a: ${recipientName || "Destinatario"}`,
-        });
+        if (targetIds.length > 1) {
+          await uploadGroupEvidence({
+            orderIds: targetIds,
+            base64Image: photo,
+            signatureText: `Entregado a: ${recipientName || "Destinatario"} (Parada conjunta)`,
+          });
+        } else {
+          await uploadEvidence({
+            orderId: targetIds[0],
+            base64Image: photo,
+            signatureText: `Entregado a: ${recipientName || "Destinatario"}`,
+          });
+        }
       }
 
       trackingService.stopTracking();
-      await updateStatus({
-        orderId: currentOrderId,
-        status: ORDER_STATUS.DELIVERED,
-        latitude,
-        longitude,
-      });
+
+      for (const tgt of targetOrders) {
+        await updateStatus({
+          orderId: tgt.id,
+          status: ORDER_STATUS.DELIVERED,
+          latitude,
+          longitude,
+        });
+      }
 
       navigation.replace("Success", {
         orderId: currentOrderId,
-        client,
-        guia: waybill,
+        client: targetOrders.map((o: any) => o.client).join(" / "),
+        guia: targetOrders.map((o: any) => o.waybill).filter(Boolean).join(", "),
         isObserved: false,
       });
     } catch (err: any) {
@@ -242,6 +278,77 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
       </View>
 
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Card Parada Conjunta si hay múltiples pedidos */}
+        {isGroupedStop && order.groupedOrders && (
+          <View style={[styles.card, { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="git-merge-outline" size={18} color="#6D28D9" />
+                <Text style={{ fontSize: 14, fontWeight: "800", color: "#5B21B6" }}>
+                  Parada Conjunta ({order.groupedOrders.length} Pedidos)
+                </Text>
+              </View>
+              <View style={{ backgroundColor: "#EDE9FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#6D28D9" }}>Misma Ubicación</Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
+              Esta parada agrupa múltiples entregas en el mismo destino. Puedes confirmar la entrega de todos con una sola foto.
+            </Text>
+
+            <View style={{ gap: 8 }}>
+              {order.groupedOrders.map((sub: any, idx: number) => {
+                const isThisOrder = sub.id === currentOrderId;
+                const isDelivered = sub.status === ORDER_STATUS.DELIVERED;
+                return (
+                  <View
+                    key={sub.id || idx}
+                    style={{
+                      backgroundColor: isThisOrder ? "#FFFFFF" : "#FDF4FF",
+                      borderWidth: 1,
+                      borderColor: isThisOrder ? "#8B5CF6" : "#E9D5FF",
+                      borderRadius: 10,
+                      padding: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E1B4B" }}>
+                          #{sub.code}
+                        </Text>
+                        {sub.waybill ? (
+                          <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>
+                            Guía: {sub.waybill}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={{ fontSize: 11, color: "#4B5563", marginTop: 2 }}>
+                        {sub.client || sub.recipientName || "Cliente"}
+                      </Text>
+                    </View>
+
+                    <View>
+                      {isDelivered ? (
+                        <View style={{ backgroundColor: "#D1FAE5", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "800", color: "#059669" }}>✓ Entregado</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: "#EDE9FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#6D28D9" }}>Pendiente</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* Card 1: Datos Principales del Despacho (Dirección, Guía, Contacto) */}
         <View style={styles.card}>
 
@@ -362,7 +469,11 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
         <FooterActionContainer>
           <View style={styles.footerButtonsRow}>
             <PrimaryButton
-              title="Confirmar Entrega"
+              title={
+                isGroupedStop && pendingInGroup.length > 1
+                  ? `Entregar Ambos (${pendingInGroup.length}) ✓`
+                  : "Confirmar Entrega"
+              }
               onPress={handleConfirmDelivery}
               isLoading={isConfirming}
               disabled={isSubmitting}

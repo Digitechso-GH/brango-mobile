@@ -24,13 +24,13 @@ export const LoginScreen = () => {
       if (!password) setPasswordError("La contraseña es obligatoria");
       return;
     }
-    
+
     setLoading(true);
     try {
       const data = await loginApi({ email, password });
 
       if (data && data.token && data.user) {
-        if (data.user.rol !== "SYS_DRIVER") {
+        if (data.user.role !== "SYS_DRIVER") {
           Alert.alert("Acceso denegado", "Este portal es exclusivo para conductores.");
           setLoading(false);
           return;

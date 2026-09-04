@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchAssignedOrders, updateOrderStatus, uploadEvidencePhoto, Order } from "../api/orders.api";
+import { fetchAssignedOrders, updateOrderStatus, uploadEvidencePhoto, uploadGroupEvidencePhoto, Order } from "../api/orders.api";
 import { useAuthStore } from "../../auth/store/useAuthStore";
 import { mapStatusToBackend } from "../constants/order-status";
 
@@ -88,6 +88,35 @@ export const useOrders = () => {
     },
   });
 
+  const uploadGroupEvidenceMutation = useMutation({
+    mutationFn: ({
+      orderIds,
+      base64Image,
+      signatureText,
+    }: {
+      orderIds: string[];
+      base64Image: string;
+      signatureText?: string;
+    }) => uploadGroupEvidencePhoto(orderIds, base64Image, signatureText),
+    onSuccess: (_, variables) => {
+      queryClient.setQueriesData({ queryKey: ["orders"] }, (oldData: any) => {
+        if (!Array.isArray(oldData)) return oldData;
+        return oldData.map((item: any) => {
+          if (variables.orderIds.includes(item.id)) {
+            return {
+              ...item,
+              evidenceUrl: variables.base64Image,
+            };
+          }
+          return item;
+        });
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["orders"], refetchType: "all" });
+      queryClient.refetchQueries({ queryKey: ["orders"] });
+    },
+  });
+
   return {
     orders: ordersQuery.data || [],
     isLoading: ordersQuery.isLoading,
@@ -97,5 +126,7 @@ export const useOrders = () => {
     isUpdatingStatus: updateStatusMutation.isPending,
     uploadEvidence: uploadEvidenceMutation.mutateAsync,
     isUploadingEvidence: uploadEvidenceMutation.isPending,
+    uploadGroupEvidence: uploadGroupEvidenceMutation.mutateAsync,
+    isUploadingGroupEvidence: uploadGroupEvidenceMutation.isPending,
   };
 };

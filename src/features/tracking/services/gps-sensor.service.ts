@@ -44,9 +44,12 @@ class GpsSensorService {
       // 1. Intentar primero obtener la posición actual en vivo
       if (hasServices) {
         try {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
+          const loc = await Promise.race([
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500))
+          ]);
 
           if (loc && loc.coords) {
             return {
