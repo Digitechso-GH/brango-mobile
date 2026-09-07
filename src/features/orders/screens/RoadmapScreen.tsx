@@ -701,9 +701,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header Compacto */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText} numberOfLines={1}>
-          ¡Hola, {user?.name || "Conductor"}!
-        </Text>
+        <Text style={styles.welcomeText}>¡Hola, {user?.name || "Conductor"}!</Text>
         <TouchableOpacity
           onPress={handleFinalizeShift}
           disabled={!isShiftFinalizable}
