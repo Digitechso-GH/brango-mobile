@@ -280,16 +280,16 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Card Parada Conjunta si hay múltiples pedidos */}
         {isGroupedStop && order.groupedOrders && (
-          <View style={[styles.card, { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" }]}>
+          <View style={[styles.card, { backgroundColor: "#F0F5FF", borderColor: "#D6E4FF" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons name="git-merge-outline" size={18} color="#6D28D9" />
-                <Text style={{ fontSize: 14, fontWeight: "800", color: "#5B21B6" }}>
+                <Ionicons name="git-merge-outline" size={18} color="#3D5FFF" />
+                <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E3A8A" }}>
                   Parada Conjunta ({order.groupedOrders.length} Pedidos)
                 </Text>
               </View>
-              <View style={{ backgroundColor: "#EDE9FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#6D28D9" }}>Misma Ubicación</Text>
+              <View style={{ backgroundColor: "#DBEAFE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#3D5FFF" }}>Misma Ubicación</Text>
               </View>
             </View>
 
@@ -299,15 +299,14 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
             <View style={{ gap: 8 }}>
               {order.groupedOrders.map((sub: any, idx: number) => {
-                const isThisOrder = sub.id === currentOrderId;
                 const isDelivered = sub.status === ORDER_STATUS.DELIVERED;
                 return (
                   <View
                     key={sub.id || idx}
                     style={{
-                      backgroundColor: isThisOrder ? "#FFFFFF" : "#FDF4FF",
+                      backgroundColor: "#FFFFFF",
                       borderWidth: 1,
-                      borderColor: isThisOrder ? "#8B5CF6" : "#E9D5FF",
+                      borderColor: "#E2E8F0",
                       borderRadius: 10,
                       padding: 10,
                       flexDirection: "row",
@@ -317,7 +316,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
                   >
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E1B4B" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E293B" }}>
                           #{sub.code}
                         </Text>
                         {sub.waybill ? (
@@ -337,8 +336,8 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
                           <Text style={{ fontSize: 11, fontWeight: "800", color: "#059669" }}>✓ Entregado</Text>
                         </View>
                       ) : (
-                        <View style={{ backgroundColor: "#EDE9FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#6D28D9" }}>Pendiente</Text>
+                        <View style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>Pendiente</Text>
                         </View>
                       )}
                     </View>

@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Platform, ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface FooterActionContainerProps {
   children: React.ReactNode;
@@ -7,14 +8,20 @@ interface FooterActionContainerProps {
 }
 
 export const FooterActionContainer: React.FC<FooterActionContainerProps> = ({ children, style }) => {
-  return <View style={[styles.container, style]}>{children}</View>;
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom + 8, Platform.OS === "ios" ? 34 : 20);
+
+  return (
+    <View style={[styles.container, { paddingBottom: bottomPadding }, style]}>
+      {children}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: Platform.OS === "ios" ? 34 : 24,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",

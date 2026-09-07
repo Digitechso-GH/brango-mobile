@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { ORDER_STATUS } from "../constants/order-status";
 import { OrderCardProps, Order } from "../types/orders.types";
 
@@ -136,6 +137,7 @@ export interface RouteGroup {
   name: string;
   status: "PENDING" | "IN_TRANSIT" | "COMPLETED" | "OBSERVED";
   date: string;
+  sequenceIndex?: number;
   overviewPolyline?: string | null;
   orders: Order[];
   totalOrders: number;
@@ -156,12 +158,12 @@ export const RouteCard: React.FC<RouteCardProps> = ({ route, onSelectRoute }) =>
 
   const getStatusBadge = () => {
     if (isInTransit) {
-      return { label: "🚚 En Curso", bg: "#FEF3C7", text: "#D97706" };
+      return { label: "En Curso", bg: "#FEF3C7", text: "#D97706" };
     }
     if (isCompleted) {
       return { label: "✓ Completada", bg: "#ECFDF5", text: "#059669" };
     }
-    return { label: "📦 Pendiente", bg: "#EEF2FF", text: "#3D5FFF" };
+    return { label: "Pendiente", bg: "#F1F5F9", text: "#64748B" };
   };
 
   const badge = getStatusBadge();
@@ -178,7 +180,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({ route, onSelectRoute }) =>
       {/* 1. Header de la Cartilla de Ruta (Ícono, Nombre, Badge de Estado) */}
       <View style={styles.routeHeaderRow}>
         <View style={styles.routeIconContainer}>
-          <Text style={{ fontSize: 20 }}>{isInTransit ? "🚚" : "🗺️"}</Text>
+          <Ionicons name={isInTransit ? "car-outline" : "map-outline"} size={22} color={isInTransit ? "#D97706" : "#3D5FFF"} />
         </View>
 
         <View style={styles.routeTitleContainer}>
@@ -422,11 +424,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   routePendingPill: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#F1F5F9",
   },
   routePendingText: {
     fontSize: 11,
-    color: "#3D5FFF",
+    color: "#64748B",
     fontWeight: "800",
   },
   routeCompletedPill: {

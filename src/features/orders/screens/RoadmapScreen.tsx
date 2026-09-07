@@ -232,6 +232,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
           name: r.name || `Ruta #${r.sequenceIndex || 1}`,
           status: routeStatus,
           date: r.date,
+          sequenceIndex: r.sequenceIndex ?? 1,
           orders: mappedOrders,
           totalOrders: total,
           pendingOrders: pendingCount,
@@ -321,6 +322,40 @@ export const RoadmapScreen = ({ navigation }: any) => {
 
     return todayLimaStr === routeDateStr;
   }, [selectedRoute]);
+
+  // Validar si el chofer tiene rutas previas abiertas sin cerrar
+  // Separación estricta:
+  // (a) Cualquier fecha anterior bloquea sin importar el sequenceIndex.
+  // (b) Misma fecha compara por sequenceIndex menor.
+  const hasUnclosedPriorRoute = useMemo(() => {
+    if (!selectedRoute || !selectedRoute.date) return false;
+
+    const selectedDateStr = selectedRoute.date.split("T")[0];
+    const selectedSeq = selectedRoute.sequenceIndex ?? 1;
+
+    return routeGroups.some((r) => {
+      if (r.id === selectedRoute.id) return false;
+
+      // Verificar si la ruta tiene pedidos activos pendientes o en tránsito
+      const isOpen = r.status !== "COMPLETED" && (r.pendingOrders > 0 || r.status === "IN_TRANSIT");
+      if (!isOpen) return false;
+
+      const rDateStr = r.date.split("T")[0];
+      const rSeq = r.sequenceIndex ?? 1;
+
+      // Condición A: Fecha estrictamente anterior (bloquea sin importar sequenceIndex)
+      if (rDateStr < selectedDateStr) {
+        return true;
+      }
+
+      // Condición B: Misma fecha, pero sequenceIndex menor
+      if (rDateStr === selectedDateStr && rSeq < selectedSeq) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [selectedRoute, routeGroups]);
 
   const [streetRouteCoordinates, setStreetRouteCoordinates] = useState<LatLng[]>([]);
 
@@ -462,23 +497,12 @@ export const RoadmapScreen = ({ navigation }: any) => {
         return;
       }
 
-      if (targetOrder.groupedOrders && targetOrder.groupedOrders.length > 0) {
-        for (const subOrder of targetOrder.groupedOrders) {
-          await updateOrderStatus({
-            orderId: subOrder.id,
-            status: ORDER_STATUS.IN_TRANSIT,
-            latitude,
-            longitude,
-          });
-        }
-      } else {
-        await updateOrderStatus({
-          orderId: targetOrder.id,
-          status: ORDER_STATUS.IN_TRANSIT,
-          latitude,
-          longitude,
-        });
-      }
+      await updateOrderStatus({
+        orderId: targetOrder.id,
+        status: ORDER_STATUS.IN_TRANSIT,
+        latitude,
+        longitude,
+      });
 
       setFocusedOrderId(targetOrder.id);
       await trackingService.startTracking(targetOrder.id, latitude, longitude);
@@ -639,8 +663,10 @@ export const RoadmapScreen = ({ navigation }: any) => {
     const routeToClose = selectedRoute || activeRoute;
     if (!routeToClose) return false;
     if (routeToClose.status === "COMPLETED") return false;
+    // Si la ruta tiene una ruta previa abierta, no se puede cerrar antes que la anterior
+    if (hasUnclosedPriorRoute) return false;
     return !routeToClose.orders.some((o: Order) => o.status === ORDER_STATUS.IN_TRANSIT);
-  }, [selectedRoute, activeRoute]);
+  }, [selectedRoute, activeRoute, hasUnclosedPriorRoute]);
 
   // Cierre de Jornada (Logout): Llama al endpoint de cierre por Ruta y luego desloguea
   const handleFinalizeShift = () => {
@@ -675,7 +701,9 @@ export const RoadmapScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header Compacto */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>¡Hola, {user?.name || "Conductor"}!</Text>
+        <Text style={styles.welcomeText} numberOfLines={1}>
+          ¡Hola, {user?.name || "Conductor"}!
+        </Text>
         <TouchableOpacity
           onPress={handleFinalizeShift}
           disabled={!isShiftFinalizable}
@@ -785,53 +813,55 @@ export const RoadmapScreen = ({ navigation }: any) => {
         )}
       </View>
 
-      <FooterActionContainer>
-        {!selectedRoute ? (
-          <PrimaryButton
-            title="Selecciona una Ruta"
-            onPress={() => {}}
-            disabled={true}
-            variant="primary"
-          />
-        ) : isCurrentRouteCompleted ? (
-          <PrimaryButton
-            title="Ruta Finalizada ✓"
-            onPress={() => {}}
-            disabled={true}
-            variant="primary"
-          />
-        ) : !isSelectedRouteForToday ? (
-          <PrimaryButton
-            title="Programada para otro día"
-            onPress={() => {}}
-            disabled={true}
-            variant="primary"
-          />
-        ) : (
-          <PrimaryButton
-            title={
-              isStartingRoute
-                ? "Iniciando Recorrido..."
-                : currentRouteInTransitOrder
-                ? "Recorrido en Curso"
-                : orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING
-                ? "Pedido ya gestionado"
-                : !currentRouteNextPendingOrder
-                ? "No hay pedidos pendientes"
-                : "Iniciar Recorrido ▶"
-            }
-            onPress={handleStartRoute}
-            isLoading={isStartingRoute}
-            disabled={
-              isStartingRoute ||
-              !!currentRouteInTransitOrder ||
-              (!!orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING) ||
-              (!orderToDisplay && !currentRouteNextPendingOrder)
-            }
-            variant="primary"
-          />
-        )}
-      </FooterActionContainer>
+      {selectedRoute && (
+        <FooterActionContainer>
+          {hasUnclosedPriorRoute ? (
+            <PrimaryButton
+              title="Cierra tu ruta anterior primero"
+              onPress={() => {}}
+              disabled={true}
+              variant="primary"
+            />
+          ) : isCurrentRouteCompleted ? (
+            <PrimaryButton
+              title="Ruta Finalizada ✓"
+              onPress={() => {}}
+              disabled={true}
+              variant="primary"
+            />
+          ) : !isSelectedRouteForToday ? (
+            <PrimaryButton
+              title="Ruta Inhabilitada"
+              onPress={() => {}}
+              disabled={true}
+              variant="primary"
+            />
+          ) : (
+            <PrimaryButton
+              title={
+                isStartingRoute
+                  ? "Iniciando Recorrido..."
+                  : currentRouteInTransitOrder
+                  ? "Recorrido en Curso"
+                  : orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING
+                  ? "Pedido ya gestionado"
+                  : !currentRouteNextPendingOrder
+                  ? "No hay pedidos pendientes"
+                  : "Iniciar Recorrido ▶"
+              }
+              onPress={handleStartRoute}
+              isLoading={isStartingRoute}
+              disabled={
+                isStartingRoute ||
+                !!currentRouteInTransitOrder ||
+                (!!orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING) ||
+                (!orderToDisplay && !currentRouteNextPendingOrder)
+              }
+              variant="primary"
+            />
+          )}
+        </FooterActionContainer>
+      )}
 
       <AppModal
         visible={showGpsModal}
