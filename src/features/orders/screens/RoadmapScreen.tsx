@@ -166,7 +166,11 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const fetchRealRoutes = useCallback(async () => {
     try {
       setIsLoadingBackendRoutes(true);
-      const res = await apiClient.get(API_ENDPOINTS.ROUTES.MOBILE);
+      const params: any = {};
+      if (driverId) {
+        params.driverId = driverId;
+      }
+      const res = await apiClient.get(API_ENDPOINTS.ROUTES.MOBILE, { params });
       const payload = res.data?.success !== undefined ? res.data.data : res.data;
       
       if (!Array.isArray(payload)) {
@@ -254,7 +258,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
     } finally {
       setIsLoadingBackendRoutes(false);
     }
-  }, []);
+  }, [driverId]);
 
   // Escuchar asignación de nuevos pedidos por Socket en tiempo real
   useEffect(() => {
