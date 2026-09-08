@@ -86,6 +86,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     longitude: targetLongitude,
     evidenceUrl,
     reasonText,
+    signatureText,
     status,
   } = order;
 
@@ -159,18 +160,22 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
       const targetOrders = isGroupedStop && pendingInGroup.length > 1 ? pendingInGroup : [order];
       const targetIds = targetOrders.map((o: any) => o.id);
 
+      const deliveryNote = observationNote.trim();
+      const defaultSig = `Entregado a: ${recipientName || "Destinatario"}`;
+      const sigText = deliveryNote ? `${defaultSig} — ${deliveryNote}` : defaultSig;
+
       if (photo) {
         if (targetIds.length > 1) {
           await uploadGroupEvidence({
             orderIds: targetIds,
             base64Image: photo,
-            signatureText: `Entregado a: ${recipientName || "Destinatario"} (Parada conjunta)`,
+            signatureText: `${sigText} (Parada conjunta)`,
           });
         } else {
           await uploadEvidence({
             orderId: targetIds[0],
             base64Image: photo,
-            signatureText: `Entregado a: ${recipientName || "Destinatario"}`,
+            signatureText: sigText,
           });
         }
       }
@@ -183,6 +188,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           status: ORDER_STATUS.DELIVERED,
           latitude,
           longitude,
+          reasonText: deliveryNote || undefined,
         });
       }
 
@@ -388,21 +394,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
             <Text style={styles.tableValue}>{recipientPhone || "-"}</Text>
           </View>
 
-          {/* Observación Registrada (reasonText) */}
-          {reasonText ? (
-            <>
-              <View style={styles.tableRowDivider} />
-              <View style={styles.tableRow}>
-                <View style={styles.tableRowLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: "#FEF2F2" }]}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
-                  </View>
-                  <Text style={styles.tableLabel}>Observación</Text>
-                </View>
-                <Text style={[styles.tableValue, { color: "#EF4444" }]}>{reasonText}</Text>
-              </View>
-            </>
-          ) : null}
+
 
           {/* Banner Informativo si el pedido está Pendiente */}
           {isPending ? (
@@ -441,17 +433,51 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           </View>
         ) : null}
 
-        {/* Card 3: Observaciones / Incidencias (Solo cuando está EN CAMINO) */}
+        {/* Card: Comentario / Nota Guardada (Visible al completar u observar) */}
+        {(() => {
+          const noteToDisplay = reasonText || signatureText;
+          if (!noteToDisplay) return null;
+
+          const isDelivered = status === ORDER_STATUS.DELIVERED;
+          const isObserved = status === ORDER_STATUS.OBSERVED;
+
+          const badgeBg = isDelivered ? "#DCFCE7" : isObserved ? "#FEE2E2" : "#F1F5F9";
+          const iconColor = isDelivered ? "#059669" : isObserved ? "#DC2626" : "#475569";
+          const iconName = isDelivered ? "checkmark-circle-outline" : isObserved ? "alert-circle-outline" : "chatbubble-ellipses-outline";
+          const title = isDelivered
+            ? "Nota / Comentario de Entrega"
+            : isObserved
+            ? "Motivo de Observación / Incidencia"
+            : "Comentario Registrado";
+
+          return (
+            <View style={[styles.card, { backgroundColor: isDelivered ? "#F0FDF4" : isObserved ? "#FEF2F2" : "#F8FAFC", borderColor: isDelivered ? "#BBF7D0" : isObserved ? "#FECACA" : "#E2E8F0" }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <View style={[styles.iconBadge, { backgroundColor: badgeBg }]}>
+                  <Ionicons name={iconName as any} size={16} color={iconColor} />
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: iconColor }}>
+                  {title}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, color: isDelivered ? "#166534" : isObserved ? "#991B1B" : "#1E293B", lineHeight: 18, marginTop: 4 }}>
+                {noteToDisplay}
+              </Text>
+            </View>
+          );
+        })()}
+
+        {/* Card 3: Observaciones / Comentarios (Solo cuando está EN CAMINO) */}
         {isInTransit ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Reportar Observación / Incidencia</Text>
+            <Text style={styles.cardTitle}>Comentario / Nota de Entrega u Observación</Text>
             <Text style={styles.cardSubtitle}>
-              Ingresa cualquier nota importante si el cliente no se encuentra o hay alguna restricción.
+              Ingresa cualquier nota importante sobre la entrega (ej. con quién se deja) o motivo de incidencia.
             </Text>
 
             <TextInput
               style={styles.textArea}
-              placeholder="Ej: Cliente ausente, recepción cerrada, reprogramado..."
+              placeholder="Ej: Dejado en garita con vigilante, cliente ausente, etc."
               placeholderTextColor="#94A3B8"
               multiline
               numberOfLines={3}

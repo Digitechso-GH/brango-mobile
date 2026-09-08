@@ -20,6 +20,7 @@ export interface Order {
   status: keyof typeof MOBILE_STATUS_MAP;
   rawState?: string;
   reasonText?: string | null;
+  signatureText?: string | null;
   latitude: number | null;
   longitude: number | null;
   originText?: string | null;
