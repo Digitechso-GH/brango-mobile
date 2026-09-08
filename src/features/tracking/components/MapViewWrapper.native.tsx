@@ -15,6 +15,7 @@ interface MapViewWrapperProps {
   zoomEnabled?: boolean;
   theme?: MapTheme;
   googleMapId?: string;
+  focusKey?: number;
   markers?: Array<{
     id: string | number;
     latitude: number;
@@ -39,11 +40,22 @@ export const MapViewWrapper = ({
   zoomEnabled = true,
   theme,
   googleMapId: customMapId,
+  focusKey,
   markers = [],
   routeCoordinates = [],
 }: MapViewWrapperProps) => {
   const dynamicMapId = useMapId(theme);
   const activeMapId = customMapId || dynamicMapId;
+
+  const [tracksViewChanges, setTracksViewChanges] = React.useState(true);
+
+  React.useEffect(() => {
+    setTracksViewChanges(true);
+    const timer = setTimeout(() => {
+      setTracksViewChanges(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [markers, focusKey]);
 
   return (
     <MapView
@@ -72,7 +84,7 @@ export const MapViewWrapper = ({
 
         return (
           <Marker
-            key={m.id}
+            key={`${m.id}_${m.color || ""}_${m.label || ""}_${focusKey || 0}`}
             coordinate={{
               latitude: m.latitude,
               longitude: m.longitude,
@@ -80,6 +92,8 @@ export const MapViewWrapper = ({
             title={m.title}
             description={m.description}
             pinColor={m.color || "#3D5FFF"}
+            tracksViewChanges={tracksViewChanges}
+            zIndex={isTruckMarker ? 999 : m.color === "#F59E0B" ? 500 : 100}
           >
             {isTruckMarker ? (
               <View
@@ -96,8 +110,7 @@ export const MapViewWrapper = ({
                   shadowOffset: { width: 0, height: 3 },
                   shadowOpacity: 0.35,
                   shadowRadius: 5,
-                  elevation: 6,
-                }}
+                                  }}
               >
                 <Text style={{ fontSize: 22 }}>🚚</Text>
               </View>
@@ -117,8 +130,7 @@ export const MapViewWrapper = ({
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.3,
                     shadowRadius: 4,
-                    elevation: 6,
-                  }}
+                                      }}
                 >
                   <Text
                     style={{

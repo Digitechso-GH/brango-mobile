@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, FlatList, ActivityIndicator, Alert, Platform, TouchableOpacity, Linking } from "react-native";
 import * as Location from "expo-location";
 import { useOrders } from "../hooks/useOrders";
@@ -106,6 +107,8 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const [showGpsModal, setShowGpsModal] = useState(false);
   const [errorModal, setErrorModal] = useState({ visible: false, message: "" });
   const [isStartingRoute, setIsStartingRoute] = useState(false);
+
+  const [focusKey, setFocusKey] = useState(0);
 
 
 
@@ -279,6 +282,15 @@ export const RoadmapScreen = ({ navigation }: any) => {
   useEffect(() => {
     fetchRealRoutes();
   }, [fetchRealRoutes, orders]);
+
+  // Al regresar a la pantalla (ej. desde el detalle del pedido), refrescar datos y forzar repintado de marcadores
+  useFocusEffect(
+    useCallback(() => {
+      setFocusKey((prev) => prev + 1);
+      refetch();
+      fetchRealRoutes();
+    }, [refetch, fetchRealRoutes])
+  );
 
   const routeGroups = realBackendRoutes;
 
@@ -763,6 +775,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
         initialRegion={selectedRegion}
         markers={markers}
         routeCoordinates={streetRouteCoordinates}
+        focusKey={focusKey}
       />
 
       <View style={styles.listContainer}>

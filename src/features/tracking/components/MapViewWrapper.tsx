@@ -13,6 +13,7 @@ export interface MapViewWrapperProps {
   zoomEnabled?: boolean;
   theme?: "light" | "dark";
   googleMapId?: string;
+  focusKey?: number;
   markers?: Array<{
     id: string | number;
     latitude: number;
