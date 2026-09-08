@@ -11,11 +11,13 @@ const resolvedUrl = Platform.select({
   default: rawAndroidUrl || rawIosUrl || rawWebUrl,
 });
 
-if (!resolvedUrl) {
-  throw new Error("Missing required environment variable: EXPO_PUBLIC_API_URL_WEB, EXPO_PUBLIC_API_URL_ANDROID or EXPO_PUBLIC_API_URL_IOS");
-}
+// Fallback seguro a producción si el build de EAS no inyectó variables de entorno
+const FALLBACK_PROD_URL = "https://api.brango.syncrodg.com";
 
-export const API_URL = resolvedUrl;
+export const API_URL = resolvedUrl || FALLBACK_PROD_URL;
+if (!resolvedUrl) {
+  console.warn("[env] Advertencia: Variables EXPO_PUBLIC_API_URL_* no presentes, usando URL de respaldo:", API_URL);
+}
 
 
 

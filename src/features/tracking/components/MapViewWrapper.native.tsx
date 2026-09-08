@@ -23,6 +23,8 @@ interface MapViewWrapperProps {
     description?: string;
     color?: string;
     isTruck?: boolean;
+    label?: string | number;
+    badgeCount?: number;
   }>;
   routeCoordinates?: Array<{
     latitude: number;
@@ -118,7 +120,37 @@ export const MapViewWrapper = ({
                     elevation: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 18, color: "#FFFFFF" }}>📍</Text>
+                  <Text
+                    style={{
+                      fontSize: m.label !== undefined && !isNaN(Number(m.label)) ? 16 : 18,
+                      fontWeight: "900",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {m.label !== undefined && m.label !== null ? String(m.label) : "📍"}
+                  </Text>
+                  {m.badgeCount && m.badgeCount > 1 ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: -5,
+                        right: -5,
+                        backgroundColor: "#0F172A",
+                        borderColor: "#FFFFFF",
+                        borderWidth: 1.5,
+                        borderRadius: 10,
+                        minWidth: 18,
+                        height: 18,
+                        paddingHorizontal: 3,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: "900", color: "#FFFFFF" }}>
+                        {m.badgeCount}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View
                   style={{

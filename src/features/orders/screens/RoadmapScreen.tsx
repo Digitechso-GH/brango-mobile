@@ -24,6 +24,7 @@ function consolidateOrdersIntoStops(rawOrders: Order[]): Order[] {
   const groupsMap = new Map<string, Order[]>();
   const nonGrouped: Order[] = [];
 
+  // ÚNICAMENTE agrupar si el administrador lo consolidó manualmente (stopGroupId)
   for (const o of rawOrders) {
     if (o.stopGroupId) {
       if (!groupsMap.has(o.stopGroupId)) {
@@ -54,6 +55,10 @@ function consolidateOrdersIntoStops(rawOrders: Order[]): Order[] {
       status = ORDER_STATUS.OBSERVED;
     }
 
+    const minSeq = Math.min(
+      ...items.map((i) => (typeof i.sequenceIndex === "number" && i.sequenceIndex > 0 ? i.sequenceIndex : 999999))
+    );
+
     stops.push({
       ...first,
       id: first.id,
@@ -62,7 +67,7 @@ function consolidateOrdersIntoStops(rawOrders: Order[]): Order[] {
       code: items.map((i) => i.code).join(", "),
       waybill: items.map((i) => i.waybill).filter(Boolean).join(", "),
       status,
-      sequenceIndex: Math.min(...items.map((i) => i.sequenceIndex ?? 0)),
+      sequenceIndex: minSeq === 999999 ? 0 : minSeq,
     });
   }
 
@@ -533,10 +538,25 @@ export const RoadmapScreen = ({ navigation }: any) => {
 
   // 2. Destinos: si hay una ruta seleccionada, mostrar EXCLUSIVAMENTE los pedidos de esa ruta
   if (selectedRoute) {
+    // Detectar pedidos con coordenadas idénticas para evitar que se tapen en el mapa
+    const coordCounts = new Map<string, number>();
+    const coordIndices = new Map<string, number>();
+
+    activeOrdersForView.forEach((o) => {
+      if (o.latitude !== null && o.longitude !== null) {
+        const key = `${o.latitude.toFixed(5)}_${o.longitude.toFixed(5)}`;
+        coordCounts.set(key, (coordCounts.get(key) || 0) + 1);
+      }
+    });
+
     activeOrdersForView.forEach((o, index) => {
       if (o.latitude !== null && o.longitude !== null) {
+        const stopNumber = (typeof o.sequenceIndex === "number" && o.sequenceIndex > 0)
+          ? o.sequenceIndex
+          : (index + 1);
+
         let markerColor = "#3D5FFF"; // PENDING
-        let statusLabel = `Parada ${index + 1}`;
+        let statusLabel = `Parada ${stopNumber}`;
 
         if (o.status === ORDER_STATUS.IN_TRANSIT) {
           markerColor = "#F59E0B";
@@ -549,22 +569,39 @@ export const RoadmapScreen = ({ navigation }: any) => {
           statusLabel = "Observado";
         }
 
-        const groupNote = o.groupedOrders && o.groupedOrders.length > 1 ? ` · ${o.groupedOrders.length} pedidos` : "";
+        const packageCount = o.groupedOrders?.length || 1;
+        const groupNote = packageCount > 1 ? ` · ${packageCount} pedidos` : "";
+
+        // Si dos pedidos no consolidados tienen la misma coordenada exacta, desplazarlos ~18m para que no se tapen
+        const key = `${o.latitude.toFixed(5)}_${o.longitude.toFixed(5)}`;
+        const totalAtCoord = coordCounts.get(key) || 1;
+        let offsetLng = 0;
+        if (totalAtCoord > 1) {
+          const currentIdx = coordIndices.get(key) || 0;
+          coordIndices.set(key, currentIdx + 1);
+          offsetLng = (currentIdx - (totalAtCoord - 1) / 2) * 0.00018;
+        }
 
         markers.push({
           id: `dest-${o.id}`,
           latitude: o.latitude,
-          longitude: o.longitude,
+          longitude: o.longitude + offsetLng,
           title: `${o.client} (${statusLabel}${groupNote})`,
           description: o.address,
           color: markerColor,
+          label: stopNumber,
+          badgeCount: packageCount > 1 ? packageCount : undefined,
         });
       }
     });
   } else {
     // Modo vista general de rutas: mostrar pedidos pendientes de todas las rutas
-    pendingOrders.forEach((o) => {
+    pendingOrders.forEach((o, index) => {
       if (o.latitude !== null && o.longitude !== null) {
+        const stopNumber = (typeof o.sequenceIndex === "number" && o.sequenceIndex > 0)
+          ? o.sequenceIndex
+          : (index + 1);
+
         markers.push({
           id: `dest-${o.id}`,
           latitude: o.latitude,
@@ -572,6 +609,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
           title: `${o.client} (Pendiente)`,
           description: o.address,
           color: o.status === ORDER_STATUS.IN_TRANSIT ? "#F59E0B" : "#3D5FFF",
+          label: stopNumber,
         });
       }
     });

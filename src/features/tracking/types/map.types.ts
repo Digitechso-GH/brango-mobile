@@ -8,6 +8,8 @@ export interface MapMarkerItem {
   description?: string;
   color?: string;
   isTruck?: boolean;
+  label?: string | number;
+  badgeCount?: number;
 }
 
 export interface MapPolylineItem {

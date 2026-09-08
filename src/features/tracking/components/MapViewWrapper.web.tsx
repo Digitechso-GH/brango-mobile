@@ -25,6 +25,8 @@ interface MapViewWrapperProps {
     description?: string;
     color?: string;
     isTruck?: boolean;
+    label?: string | number;
+    badgeCount?: number;
   }>;
   routeCoordinates?: Array<{
     latitude: number;
@@ -112,10 +114,17 @@ export const MapViewWrapper = ({
             </div>
           `;
         } else {
+          const displayLabel = m.label !== undefined && m.label !== null ? String(m.label) : "📍";
+          const isNum = m.label !== undefined && !isNaN(Number(m.label));
+          const badgeHtml = m.badgeCount && m.badgeCount > 1
+            ? `<div style="position: absolute; top: -5px; right: -5px; background: #0F172A; border: 1.5px solid white; border-radius: 10px; min-width: 18px; height: 18px; padding: 0 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: white;">${m.badgeCount}</div>`
+            : "";
+
           contentDiv.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-              <div style="background: ${pinColor}; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                <span style="font-size: 18px; line-height: 1; color: white;">📍</span>
+              <div style="position: relative; background: ${pinColor}; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <span style="font-size: ${isNum ? "16px" : "18px"}; font-weight: 900; line-height: 1; color: white;">${displayLabel}</span>
+                ${badgeHtml}
               </div>
               <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${pinColor}; margin-top: -2px;"></div>
             </div>

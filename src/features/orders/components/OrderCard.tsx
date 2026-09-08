@@ -82,7 +82,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         {/* 1. Número Circular (Izquierda) */}
         <View style={[styles.numberCircle, isActive && styles.activeNumberCircle]}>
           <Text style={[styles.numberText, isActive && styles.activeNumberText]}>
-            {index + 1}
+            {(typeof order.sequenceIndex === "number" && order.sequenceIndex > 0)
+              ? order.sequenceIndex
+              : (index + 1)}
           </Text>
         </View>
 
