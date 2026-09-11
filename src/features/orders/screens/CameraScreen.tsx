@@ -38,12 +38,12 @@ export const CameraScreen = ({ route, navigation }: any) => {
     } else {
       if (cameraRef.current) {
         try {
-          const options = { quality: 0.85, base64: true };
+          const options = { quality: 0.8 };
           const data = await cameraRef.current.takePictureAsync(options);
-          if (data && data.base64) {
-            setPhoto(`data:image/jpeg;base64,${data.base64}`);
-          } else if (data && data.uri) {
+          if (data && data.uri) {
             setPhoto(data.uri);
+          } else if (data && data.base64) {
+            setPhoto(`data:image/jpeg;base64,${data.base64}`);
           }
         } catch (err) {
           console.error("Error al tomar foto con CameraView:", err);

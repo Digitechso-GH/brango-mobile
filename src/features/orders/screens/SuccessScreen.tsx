@@ -1,9 +1,19 @@
 import React, { useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, BackHandler } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  BackHandler,
+  ScrollView,
+  Linking,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useOrders } from "../hooks/useOrders";
+import { ORDER_STATUS } from "../constants/order-status";
 
 export const SuccessScreen = ({ route, navigation }: any) => {
-  const { client, guia, isObserved, note } = route.params || {};
+  const { orderId, client, guia, isObserved, note } = route.params || {};
   const { orders, refetch } = useOrders();
 
   useEffect(() => {
@@ -17,7 +27,11 @@ export const SuccessScreen = ({ route, navigation }: any) => {
     };
   }, []);
 
-  const nextOrder = orders.find((o) => o.status === "PENDING" || o.status === "IN_TRANSIT");
+  const nextOrder = orders.find(
+    (o) =>
+      o.id !== orderId &&
+      (o.status === ORDER_STATUS.PENDING || o.status === ORDER_STATUS.IN_TRANSIT)
+  );
 
   const handleContinue = () => {
     try {
@@ -31,66 +45,117 @@ export const SuccessScreen = ({ route, navigation }: any) => {
     });
   };
 
+  const handleOpenSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch (e) {
+      // Ignorar si falla
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={[styles.iconContainer, isObserved && styles.observedIconContainer]}>
-          <Text style={[styles.iconText, isObserved && styles.observedIconText]}>
-            {isObserved ? "⚠️" : "✓"}
-          </Text>
-        </View>
-
-        <Text style={styles.title}>
-          {isObserved ? "Incidencia Registrada" : "Entrega Confirmada"}
-        </Text>
-        
-        <Text style={styles.subtitle}>
-          {client || "—"} {guia ? `· Guía #${guia}` : ""}
-        </Text>
-
-        {note ? (
-          <View style={styles.noteCard}>
-            <Text style={styles.noteLabel}>Observación registrada:</Text>
-            <Text style={styles.noteText}>{note}</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.card}>
+          {/* Header Superior con ícono sutil de configuración */}
+          <View style={styles.cardHeader}>
+            <TouchableOpacity
+              onPress={handleOpenSettings}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="settings-outline" size={20} color="#94A3B8" />
+            </TouchableOpacity>
           </View>
-        ) : null}
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            {isObserved
-              ? "La incidencia fue notificada a la Torre de Control y registrada en la hoja de ruta."
-              : "La evidencia de entrega ha sido guardada y notificada correctamente."}
-          </Text>
-        </View>
+          <View style={styles.cardBody}>
+            {/* Ícono Circular de Estado */}
+            <View style={[styles.iconContainer, isObserved && styles.observedIconContainer]}>
+              <Ionicons
+                name={isObserved ? "alert-circle-outline" : "checkmark"}
+                size={isObserved ? 36 : 34}
+                color={isObserved ? "#DC2626" : "#166534"}
+              />
+            </View>
 
-        {nextOrder ? (
-          <View style={styles.nextStopSection}>
-            <Text style={styles.nextStopLabel}>SIGUIENTE PARADA</Text>
-            <View style={styles.nextStopCard}>
-              <View style={styles.nextStopInfo}>
-                <View style={styles.stopNumberContainer}>
-                  <Text style={styles.stopIcon}>📍</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.nextStopClient}>{nextOrder.client}</Text>
-                  <Text style={styles.nextStopAddress}>{nextOrder.address}</Text>
+            {/* Título Principal */}
+            <Text style={styles.title}>
+              {isObserved ? "Incidencia reportada" : "Entrega confirmada"}
+            </Text>
+
+            {/* Subtítulo: Cliente y Guía */}
+            <Text style={styles.subtitle}>
+              {client || "—"}{guia ? ` · Guía #${guia}` : ""}
+            </Text>
+
+            {/* Nota de Incidencia / Observación (si aplica) */}
+            {isObserved && note ? (
+              <View style={styles.noteBox}>
+                <Text style={styles.noteLabel}>Motivo registrado</Text>
+                <Text style={styles.noteText}>{note}</Text>
+              </View>
+            ) : null}
+
+            {/* Caja Informativa Central */}
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                {isObserved
+                  ? "La incidencia fue notificada a la Torre de Control y registrada en la hoja de ruta."
+                  : "La evidencia de entrega se guardó y se notificó correctamente."}
+              </Text>
+            </View>
+
+            {/* Sección Siguiente Parada */}
+            {nextOrder ? (
+              <View style={styles.nextStopSection}>
+                <Text style={styles.nextStopLabel}>SIGUIENTE PARADA</Text>
+                <View style={styles.nextStopCard}>
+                  <View style={styles.stopIconContainer}>
+                    <Ionicons name="location-outline" size={20} color="#64748B" />
+                  </View>
+                  <View style={styles.nextStopDetails}>
+                    <Text style={styles.nextStopClient} numberOfLines={1}>
+                      {nextOrder.client}
+                    </Text>
+                    <Text style={styles.nextStopAddress} numberOfLines={1}>
+                      {nextOrder.address || nextOrder.formattedAddress || "—"}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.nextStopSection}>
-            <Text style={styles.nextStopLabel}>HOJA DE RUTA</Text>
-            <Text style={styles.completedText}>
-              Se actualizó el estado de tu despacho. Puedes continuar con tus demás pedidos.
-            </Text>
-          </View>
-        )}
+            ) : (
+              <View style={styles.nextStopSection}>
+                <Text style={styles.nextStopLabel}>HOJA DE RUTA</Text>
+                <View style={styles.nextStopCard}>
+                  <View style={[styles.stopIconContainer, { backgroundColor: "#ECFDF5" }]}>
+                    <Ionicons name="checkmark-done-outline" size={20} color="#059669" />
+                  </View>
+                  <View style={styles.nextStopDetails}>
+                    <Text style={styles.nextStopClient}>
+                      Hoja de ruta completada
+                    </Text>
+                    <Text style={styles.nextStopAddress}>
+                      Has gestionado todos los pedidos asignados.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
 
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue} activeOpacity={0.85}>
-          <Text style={styles.continueButtonText}>Volver a Hoja de Ruta →</Text>
-        </TouchableOpacity>
-      </View>
+            {/* Botón Principal Azul Marino */}
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={handleContinue}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.continueButtonText}>Volver a hoja de ruta →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -98,29 +163,43 @@ export const SuccessScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: "center",
     backgroundColor: "#F8FAFC",
   },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
   card: {
-    padding: 24,
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    overflow: "hidden",
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  cardBody: {
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 22,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#ECFDF5",
-    borderWidth: 1,
-    borderColor: "#A7F3D0",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#EBF7EE",
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",
@@ -128,64 +207,55 @@ const styles = StyleSheet.create({
   },
   observedIconContainer: {
     backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
-  },
-  iconText: {
-    color: "#10B981",
-    fontSize: 28,
-    fontWeight: "900",
-  },
-  observedIconText: {
-    fontSize: 26,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "700",
     textAlign: "center",
     color: "#0F172A",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#64748B",
-    fontWeight: "600",
+    fontWeight: "500",
     textAlign: "center",
     marginBottom: 20,
   },
-  noteCard: {
-    backgroundColor: "#F8FAFC",
+  noteBox: {
+    backgroundColor: "#FFFBEB",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderColor: "#FDE68A",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
   },
   noteLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#475569",
-    marginBottom: 4,
+    color: "#B45309",
+    marginBottom: 2,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   noteText: {
     fontSize: 13,
-    color: "#0F172A",
+    color: "#92400E",
     fontWeight: "600",
-    fontStyle: "normal",
     lineHeight: 18,
   },
   infoBox: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#F8FAFC",
     borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 24,
   },
   infoText: {
-    color: "#475569",
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: "600",
+    color: "#334155",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
     textAlign: "center",
   },
   nextStopSection: {
@@ -193,60 +263,49 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   nextStopLabel: {
-    fontSize: 10,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "700",
     color: "#94A3B8",
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
     marginBottom: 10,
+    textTransform: "uppercase",
   },
   nextStopCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 14,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 14,
     backgroundColor: "#FFFFFF",
   },
-  nextStopInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  stopNumberContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  stopIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#F1F5F9",
     justifyContent: "center",
     alignItems: "center",
   },
-  stopIcon: {
-    fontSize: 13,
+  nextStopDetails: {
+    flex: 1,
   },
   nextStopClient: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#0F172A",
   },
   nextStopAddress: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#64748B",
     marginTop: 2,
   },
-  completedText: {
-    fontSize: 13,
-    color: "#475569",
-    fontWeight: "600",
-    textAlign: "center",
-    paddingVertical: 8,
-  },
   continueButton: {
-    backgroundColor: "#3D5FFF",
-    borderRadius: 16,
-    paddingVertical: 15,
+    backgroundColor: "#1E293B",
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
@@ -254,6 +313,6 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: "#FFFFFF",
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "700",
   },
 });

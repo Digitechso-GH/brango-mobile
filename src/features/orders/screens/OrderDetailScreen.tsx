@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Alert, Image, Platform, TextInput, ScrollView, BackHandler, Linking } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  Image,
+  Platform,
+  TextInput,
+  ScrollView,
+  BackHandler,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useOrders } from "../hooks/useOrders";
@@ -7,21 +18,22 @@ import { trackingService } from "../../tracking/services/tracking.service";
 import { useTrackingStore } from "../../tracking/store/useTrackingStore";
 import { ORDER_STATUS } from "../constants/order-status";
 import { FooterActionContainer } from "../../../shared/components/ui/FooterActionContainer";
-import { PrimaryButton } from "../../../shared/components/ui/PrimaryButton";
 import { AppModal } from "../../../shared/components/ui/AppModal";
+import { colors } from "../../../shared/theme/theme";
 import { styles } from "./OrderDetailScreen.styles";
 
 export const OrderDetailScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
-  const { 
-    orders, 
-    updateStatus, 
-    uploadEvidence, 
+  const {
+    orders,
+    updateStatus,
+    uploadEvidence,
     uploadGroupEvidence,
-    isUpdatingStatus, 
+    isUpdatingStatus,
     isUploadingEvidence,
-    isUploadingGroupEvidence 
+    isUploadingGroupEvidence,
   } = useOrders();
+
   const [photo, setPhoto] = useState<string | null>(null);
   const [observationNote, setObservationNote] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -31,7 +43,8 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
   const orderFromHook = orders.find((o) => o.id === orderId);
   const rawOrder = route.params?.order || orderFromHook;
-  const groupedOrders = route.params?.order?.groupedOrders || 
+  const groupedOrders =
+    route.params?.order?.groupedOrders ||
     (rawOrder?.stopGroupId ? orders.filter((o) => o.stopGroupId === rawOrder.stopGroupId) : undefined);
   const order = rawOrder ? { ...rawOrder, groupedOrders } : null;
 
@@ -42,7 +55,8 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
       )
     : [];
 
-  const isSubmitting = isConfirming || isObserving || isUpdatingStatus || isUploadingEvidence || isUploadingGroupEvidence;
+  const isSubmitting =
+    isConfirming || isObserving || isUpdatingStatus || isUploadingEvidence || isUploadingGroupEvidence;
 
   useEffect(() => {
     const onBackPress = () => {
@@ -82,6 +96,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     address,
     recipientName,
     recipientPhone,
+    warehouseContact,
     latitude: targetLatitude,
     longitude: targetLongitude,
     evidenceUrl,
@@ -125,7 +140,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
         Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500))
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
       ]);
       if (currentLoc && currentLoc.coords) {
         latitude = currentLoc.coords.latitude;
@@ -272,78 +287,53 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header Fijo con Flecha Negra Limpia */}
+      {/* Header Limpio y Moderno */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBackButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Text style={styles.headerBackIcon}>←</Text>
+          <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          Detalle del Despacho
+          Detalle del despacho
         </Text>
-        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Card Parada Conjunta si hay múltiples pedidos */}
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Parada Conjunta si hay múltiples entregas */}
         {isGroupedStop && order.groupedOrders && (
-          <View style={[styles.card, { backgroundColor: "#F0F5FF", borderColor: "#D6E4FF" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons name="git-merge-outline" size={18} color="#3D5FFF" />
-                <Text style={{ fontSize: 14, fontWeight: "800", color: "#1E3A8A" }}>
-                  Parada Conjunta ({order.groupedOrders.length} Pedidos)
-                </Text>
-              </View>
-              <View style={{ backgroundColor: "#DBEAFE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#3D5FFF" }}>Misma Ubicación</Text>
-              </View>
+          <View style={styles.groupedCard}>
+            <View style={styles.groupedHeader}>
+              <Ionicons name="git-merge-outline" size={16} color="#3D5FFF" />
+              <Text style={styles.groupedTitle}>
+                Parada conjunta · {order.groupedOrders.length} pedidos
+              </Text>
             </View>
-
-            <Text style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
-              Esta parada agrupa múltiples entregas en el mismo destino. Puedes confirmar la entrega de todos con una sola foto.
+            <Text style={styles.groupedSubtitle}>
+              Confirma la entrega de ambos con una sola foto.
             </Text>
 
-            <View style={{ gap: 8 }}>
+            <View style={styles.groupedOrdersList}>
               {order.groupedOrders.map((sub: any, idx: number) => {
                 const isDelivered = sub.status === ORDER_STATUS.DELIVERED;
                 return (
-                  <View
-                    key={sub.id || idx}
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderWidth: 1,
-                      borderColor: "#E2E8F0",
-                      borderRadius: 10,
-                      padding: 10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E293B" }}>
-                          #{sub.code}
-                        </Text>
-                        {sub.waybill ? (
-                          <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>
-                            Guía: {sub.waybill}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text style={{ fontSize: 11, color: "#4B5563", marginTop: 2 }}>
+                  <View key={sub.id || idx} style={styles.groupedOrderItem}>
+                    <View style={styles.groupedOrderLeft}>
+                      <Text style={styles.groupedOrderCode}>#{sub.code}</Text>
+                      <Text style={styles.groupedOrderClient} numberOfLines={1}>
                         {sub.client || sub.recipientName || "Cliente"}
                       </Text>
                     </View>
-
                     <View>
                       {isDelivered ? (
-                        <View style={{ backgroundColor: "#D1FAE5", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "800", color: "#059669" }}>✓ Entregado</Text>
+                        <View style={styles.badgeDelivered}>
+                          <Text style={styles.badgeDeliveredText}>✓ Entregado</Text>
                         </View>
                       ) : (
-                        <View style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>Pendiente</Text>
+                        <View style={styles.badgePending}>
+                          <Text style={styles.badgePendingText}>Pendiente</Text>
                         </View>
                       )}
                     </View>
@@ -354,47 +344,60 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
-        {/* Card 1: Datos Principales del Despacho (Dirección, Guía, Contacto) */}
-        <View style={styles.card}>
-
-          {/* Fila 1: Dirección de Entrega */}
-          <View style={styles.tableRow}>
-            <View style={styles.tableRowLeft}>
-              <View style={styles.iconBadge}>
-                <Ionicons name="location-outline" size={16} color="#3D5FFF" />
-              </View>
-              <Text style={styles.tableLabel}>Dirección</Text>
+        {/* Lista de Información Principal Integrada (Sin tarjetas pesadas) */}
+        <View style={styles.infoList}>
+          {/* Dirección de Entrega */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="location-outline" size={18} color="#64748B" />
             </View>
-            <Text style={[styles.tableValue, styles.tableValueAddress]}>
-              {address || "Dirección no especificada"}
-            </Text>
-          </View>
-          <View style={styles.tableRowDivider} />
-
-          {/* Fila 2: Guía de Remisión */}
-          <View style={styles.tableRow}>
-            <View style={styles.tableRowLeft}>
-              <View style={styles.iconBadge}>
-                <Ionicons name="document-text-outline" size={16} color="#64748B" />
-              </View>
-              <Text style={styles.tableLabel}>Guía de Remisión</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Dirección</Text>
+              <Text style={styles.infoValue}>
+                {address || "Dirección no especificada"}
+              </Text>
             </View>
-            <Text style={styles.tableValue}>{waybill || "-"}</Text>
           </View>
-          <View style={styles.tableRowDivider} />
+          <View style={styles.infoDivider} />
 
-          {/* Fila 3: Contacto Cliente */}
-          <View style={styles.tableRow}>
-            <View style={styles.tableRowLeft}>
-              <View style={styles.iconBadge}>
-                <Ionicons name="call-outline" size={16} color="#64748B" />
-              </View>
-              <Text style={styles.tableLabel}>Contacto Cliente</Text>
+          {/* Guía de Remisión */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="document-text-outline" size={18} color="#64748B" />
             </View>
-            <Text style={styles.tableValue}>{recipientPhone || "-"}</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Guía de remisión</Text>
+              <Text style={styles.infoValue}>{waybill || "—"}</Text>
+            </View>
+          </View>
+          <View style={styles.infoDivider} />
+
+          {/* Contacto Cliente */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="call-outline" size={18} color="#64748B" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Contacto cliente</Text>
+              <Text style={styles.infoValue}>{recipientPhone || "—"}</Text>
+            </View>
           </View>
 
-
+          {/* Contacto Almacén (Si está presente) */}
+          {warehouseContact ? (
+            <>
+              <View style={styles.infoDivider} />
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconBox}>
+                  <Ionicons name="business-outline" size={18} color="#64748B" />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Contacto almacén</Text>
+                  <Text style={styles.infoValue}>{warehouseContact}</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
 
           {/* Banner Informativo si el pedido está Pendiente */}
           {isPending ? (
@@ -406,34 +409,43 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           ) : null}
         </View>
 
-        {/* Card 2: Evidencia Fotográfica */}
+        {/* Evidencia Fotográfica */}
         {isInTransit || currentPhoto ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Evidencia Fotográfica de Entrega</Text>
-            <Text style={styles.cardSubtitle}>
-              Fotografía de la guía de remisión firmada o del paquete entregado en destino.
+          <View style={{ marginBottom: 6 }}>
+            <Text style={styles.sectionTitle}>Evidencia fotográfica de entrega</Text>
+            <Text style={styles.sectionSubtitle}>
+              Foto de la guía firmada o del paquete entregado.
             </Text>
 
             {currentPhoto ? (
               <View style={styles.photoPreviewBox}>
                 <Image source={{ uri: currentPhoto }} style={styles.photoImage} />
                 {isInTransit ? (
-                  <TouchableOpacity style={styles.retakePhotoButton} onPress={handleTakePhoto} activeOpacity={0.8} disabled={isSubmitting}>
+                  <TouchableOpacity
+                    style={styles.retakePhotoButton}
+                    onPress={handleTakePhoto}
+                    activeOpacity={0.8}
+                    disabled={isSubmitting}
+                  >
                     <Text style={styles.retakePhotoText}>📸 Volver a tomar foto</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
             ) : (
-              <TouchableOpacity style={styles.takePhotoButton} onPress={handleTakePhoto} activeOpacity={0.85} disabled={isSubmitting}>
-                <Text style={styles.cameraIcon}>📷</Text>
-                <Text style={styles.takePhotoButtonText}>Tomar Foto de la Guía Firmada</Text>
-                <Text style={styles.takePhotoSubtext}>Obligatorio para finalizar el despacho</Text>
+              <TouchableOpacity
+                style={styles.takePhotoButton}
+                onPress={handleTakePhoto}
+                activeOpacity={0.85}
+                disabled={isSubmitting}
+              >
+                <Ionicons name="camera-outline" size={26} color={colors.primary} style={{ marginBottom: 6 }} />
+                <Text style={styles.takePhotoButtonText}>Tomar foto de la guía firmada</Text>
               </TouchableOpacity>
             )}
           </View>
         ) : null}
 
-        {/* Card: Comentario / Nota Guardada (Visible al completar u observar) */}
+        {/* Nota / Comentario Guardado (Visible si ya fue completado u observado) */}
         {(() => {
           const noteToDisplay = reasonText || signatureText;
           if (!noteToDisplay) return null;
@@ -441,9 +453,12 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           const isDelivered = status === ORDER_STATUS.DELIVERED;
           const isObserved = status === ORDER_STATUS.OBSERVED;
 
-          const badgeBg = isDelivered ? "#DCFCE7" : isObserved ? "#FEE2E2" : "#F1F5F9";
           const iconColor = isDelivered ? "#059669" : isObserved ? "#DC2626" : "#475569";
-          const iconName = isDelivered ? "checkmark-circle-outline" : isObserved ? "alert-circle-outline" : "chatbubble-ellipses-outline";
+          const iconName = isDelivered
+            ? "checkmark-circle-outline"
+            : isObserved
+            ? "alert-circle-outline"
+            : "chatbubble-ellipses-outline";
           const title = isDelivered
             ? "Nota / Comentario de Entrega"
             : isObserved
@@ -451,33 +466,43 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
             : "Comentario Registrado";
 
           return (
-            <View style={[styles.card, { backgroundColor: isDelivered ? "#F0FDF4" : isObserved ? "#FEF2F2" : "#F8FAFC", borderColor: isDelivered ? "#BBF7D0" : isObserved ? "#FECACA" : "#E2E8F0" }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <View style={[styles.iconBadge, { backgroundColor: badgeBg }]}>
-                  <Ionicons name={iconName as any} size={16} color={iconColor} />
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: "800", color: iconColor }}>
+            <View
+              style={{
+                backgroundColor: isDelivered ? "#F0FDF4" : isObserved ? "#FEF2F2" : "#F8FAFC",
+                borderColor: isDelivered ? "#BBF7D0" : isObserved ? "#FECACA" : "#E2E8F0",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 16,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Ionicons name={iconName as any} size={16} color={iconColor} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: iconColor }}>
                   {title}
                 </Text>
               </View>
-              <Text style={{ fontSize: 13, color: isDelivered ? "#166534" : isObserved ? "#991B1B" : "#1E293B", lineHeight: 18, marginTop: 4 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: isDelivered ? "#166534" : isObserved ? "#991B1B" : "#1E293B",
+                  lineHeight: 18,
+                  marginTop: 4,
+                }}
+              >
                 {noteToDisplay}
               </Text>
             </View>
           );
         })()}
 
-        {/* Card 3: Observaciones / Comentarios (Solo cuando está EN CAMINO) */}
+        {/* Comentario (opcional) mientras está EN CAMINO */}
         {isInTransit ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Comentario / Nota de Entrega u Observación</Text>
-            <Text style={styles.cardSubtitle}>
-              Ingresa cualquier nota importante sobre la entrega (ej. con quién se deja) o motivo de incidencia.
-            </Text>
-
+          <View style={styles.commentSection}>
+            <Text style={styles.commentLabel}>Comentario (opcional)</Text>
             <TextInput
               style={styles.textArea}
-              placeholder="Ej: Dejado en garita con vigilante, cliente ausente, etc."
+              placeholder="Ej: entregado en recepción, recibido por Carlos"
               placeholderTextColor="#94A3B8"
               multiline
               numberOfLines={3}
@@ -489,30 +514,39 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
         ) : null}
       </ScrollView>
 
-      {/* Footer de Acciones Principales (Solo cuando está EN CAMINO) */}
+      {/* Footer de Acciones (Botón Principal Azul + Texto Reportar Incidencia) */}
       {isInTransit && (
         <FooterActionContainer>
-          <View style={styles.footerButtonsRow}>
-            <PrimaryButton
-              title={
-                isGroupedStop && pendingInGroup.length > 1
-                  ? `Entregar Ambos (${pendingInGroup.length}) ✓`
-                  : "Confirmar Entrega"
-              }
+          <View style={styles.footerContainer}>
+            <TouchableOpacity
+              style={[styles.footerPrimaryButton, isSubmitting && { opacity: 0.7 }]}
               onPress={handleConfirmDelivery}
-              isLoading={isConfirming}
               disabled={isSubmitting}
-              variant="success"
-              style={styles.halfBtn}
-            />
-            <PrimaryButton
-              title="Reportar Incidencia"
+              activeOpacity={0.85}
+            >
+              {isConfirming ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.footerPrimaryButtonText}>
+                  {isGroupedStop && pendingInGroup.length > 1
+                    ? `✓ Entregar ambos (${pendingInGroup.length})`
+                    : "✓ Confirmar entrega"}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.footerSecondaryButton}
               onPress={handleReportObservation}
-              isLoading={isObserving}
               disabled={isSubmitting}
-              variant="danger"
-              style={styles.halfBtn}
-            />
+              activeOpacity={0.7}
+            >
+              {isObserving ? (
+                <ActivityIndicator color="#EF4444" size="small" />
+              ) : (
+                <Text style={styles.footerSecondaryButtonText}>Reportar incidencia</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </FooterActionContainer>
       )}

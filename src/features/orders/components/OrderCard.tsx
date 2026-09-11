@@ -1,7 +1,7 @@
+import Svg, { Path, Circle } from "react-native-svg";
 import React, { useRef } from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
-import Svg, { Path } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ORDER_STATUS } from "../constants/order-status";
 import { OrderCardProps, Order } from "../types/orders.types";
 
@@ -49,30 +49,51 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const clientName = cleanText(order.client || order.recipientName || `Pedido #${order.code}`);
   const address = cleanText(order.address || "—");
 
-  // Color del Pin SVG según el estado:
-  const getPinColor = (status?: string) => {
-    switch (status) {
-      case ORDER_STATUS.IN_TRANSIT:
-        return "#F59E0B";
-      case ORDER_STATUS.DELIVERED:
-        return "#10B981";
-      case ORDER_STATUS.OBSERVED:
-      case ORDER_STATUS.FAILED:
-        return "#EF4444";
-      case ORDER_STATUS.PENDING:
-      default:
-        return "#94A3B8";
-    }
+  const isInTransit = order.status === ORDER_STATUS.IN_TRANSIT;
+  const isDelivered = order.status === ORDER_STATUS.DELIVERED;
+  const isObserved = order.status === ORDER_STATUS.OBSERVED || order.status === ORDER_STATUS.FAILED;
+
+  const getCardStyle = () => {
+    if (isInTransit) return styles.inTransitCard;
+    if (isDelivered) return styles.deliveredCard;
+    if (isObserved) return styles.observedCard;
+    if (isActive) return styles.activeCard;
+    return null;
   };
 
-  const pinColor = getPinColor(order.status);
+  const getNumberCircleStyle = () => {
+    if (isInTransit) return styles.inTransitNumberCircle;
+    if (isDelivered) return styles.deliveredNumberCircle;
+    if (isObserved) return styles.observedNumberCircle;
+    if (isActive) return styles.activeNumberCircle;
+    return null;
+  };
+
+  const getNumberTextStyle = () => {
+    if (isInTransit || isActive) return styles.whiteNumberText;
+    if (isDelivered) return styles.deliveredNumberText;
+    if (isObserved) return styles.observedNumberText;
+    return null;
+  };
+
+  const getChevronColor = () => {
+    if (isInTransit) return "#D97706";
+    if (isDelivered) return "#059669";
+    if (isObserved) return "#DC2626";
+    if (isActive) return "#3D5FFF";
+    return "#CBD5E1";
+  };
+
+  const stopNumber = (typeof order.sequenceIndex === "number" && order.sequenceIndex > 0)
+    ? order.sequenceIndex
+    : (index + 1);
 
   return (
     <View style={styles.cardContainer}>
       <TouchableOpacity
         style={[
           styles.card,
-          isActive && styles.activeCard,
+          getCardStyle(),
           isLocked && styles.lockedCard,
         ]}
         onPress={handleTap}
@@ -80,11 +101,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         activeOpacity={0.75}
       >
         {/* 1. Número Circular (Izquierda) */}
-        <View style={[styles.numberCircle, isActive && styles.activeNumberCircle]}>
-          <Text style={[styles.numberText, isActive && styles.activeNumberText]}>
-            {(typeof order.sequenceIndex === "number" && order.sequenceIndex > 0)
-              ? order.sequenceIndex
-              : (index + 1)}
+        <View style={[styles.numberCircle, getNumberCircleStyle()]}>
+          <Text style={[styles.numberText, getNumberTextStyle()]}>
+            {stopNumber}
           </Text>
         </View>
 
@@ -119,17 +138,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({
           )}
         </View>
 
-        {/* 3. SVG del Pin de Ubicación Oficial BranGo (Derecha) */}
-        <View style={styles.pinContainer}>
-          <Svg viewBox="0 0 100 120" width={20} height={24} fill="none">
-            <Path
-              d="M50 0C22.3858 0 0 22.3858 0 50C0 82.5 50 120 50 120C50 120 100 82.5 100 50C100 22.3858 77.6142 0 50 0Z"
-              fill={pinColor}
-            />
-          </Svg>
-        </View>
+        {/* 3. Doble flechita para indicar visualmente los 2 taps hacia el detalle del pedido */}
+        <TouchableOpacity
+          onPress={() => onSelectOrder && onSelectOrder(order.id)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.chevronButton}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="chevron-double-right" size={20} color={getChevronColor()} />
+        </TouchableOpacity>
       </TouchableOpacity>
-
     </View>
   );
 };
@@ -160,84 +178,77 @@ export const RouteCard: React.FC<RouteCardProps> = ({ route, onSelectRoute }) =>
 
   const getStatusBadge = () => {
     if (isInTransit) {
-      return { label: "En Curso", bg: "#FEF3C7", text: "#D97706" };
+      return { label: "En curso", bg: "#FEF3C7", text: "#D97706" };
     }
     if (isCompleted) {
-      return { label: "✓ Completada", bg: "#ECFDF5", text: "#059669" };
+      return { label: "Completada", bg: "#ECFDF5", text: "#059669" };
     }
     return { label: "Pendiente", bg: "#F1F5F9", text: "#64748B" };
   };
 
   const badge = getStatusBadge();
 
+  const getSubtitle = () => {
+    if (isCompleted) {
+      return `${route.totalOrders} ${route.totalOrders === 1 ? "pedido entregado" : "pedidos entregados"}`;
+    }
+    if (route.pendingOrders > 0) {
+      return `${route.pendingOrders} ${route.pendingOrders === 1 ? "pedido pendiente" : "pedidos pendientes"}`;
+    }
+    if (route.completedOrders > 0) {
+      return `${route.completedOrders} ${route.completedOrders === 1 ? "pedido entregado" : "pedidos entregados"}`;
+    }
+    return `${route.totalOrders} ${route.totalOrders === 1 ? "pedido" : "pedidos"}`;
+  };
+
+  const iconBg = isInTransit ? "#FEF3C7" : isCompleted ? "#DCFCE7" : "#F1F5F9";
+  const iconColor = isInTransit ? "#D97706" : isCompleted ? "#059669" : "#64748B";
+
   return (
     <TouchableOpacity
       style={[
         styles.routeCard,
         isInTransit && styles.inTransitRouteCard,
+        isCompleted && styles.completedRouteCard,
       ]}
       onPress={() => onSelectRoute(route.id)}
       activeOpacity={0.75}
     >
-      {/* 1. Header de la Cartilla de Ruta (Ícono, Nombre, Badge de Estado) */}
-      <View style={styles.routeHeaderRow}>
-        <View style={styles.routeIconContainer}>
-          <Ionicons name={isInTransit ? "car-outline" : "map-outline"} size={22} color={isInTransit ? "#D97706" : "#3D5FFF"} />
-        </View>
+      <View style={[styles.routeIconCircle, { backgroundColor: iconBg }]}>
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M5 18c0-3.5 2.5-6 6.5-6h1c4 0 6.5-2.5 6.5-6"
+            stroke={iconColor}
+            strokeWidth={2.4}
+            strokeLinecap="round"
+          />
+          <Circle cx={5} cy={18} r={2.8} fill={iconColor} />
+          <Circle cx={19} cy={6} r={2.8} fill={iconColor} />
+        </Svg>
+      </View>
 
-        <View style={styles.routeTitleContainer}>
+      <View style={styles.routeMainInfo}>
+        <View style={styles.routeTitleRow}>
           <Text style={styles.routeNameText} numberOfLines={1}>
             {route.name}
           </Text>
-        </View>
-
-        <View style={[styles.routeBadge, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.routeBadgeText, { color: badge.text }]}>
-            {badge.label}
-          </Text>
-        </View>
-      </View>
-
-      {/* Divider */}
-      <View style={styles.routeDivider} />
-
-      {/* 2. Métricas Reales y Flecha Limpia */}
-      <View style={styles.routeFooterRow}>
-        <View style={styles.routeStatsContainer}>
-          <View style={styles.routeStatPill}>
-            <Text style={styles.routeStatPillLabel}>Total:</Text>
-            <Text style={styles.routeStatPillValue}>{route.totalOrders}</Text>
+          <View style={[styles.routeBadge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.routeBadgeText, { color: badge.text }]}>
+              {badge.label}
+            </Text>
           </View>
-
-          {route.pendingOrders > 0 && (
-            <View style={[styles.routeStatPill, styles.routePendingPill]}>
-              <Text style={styles.routePendingText}>
-                {route.pendingOrders} Pendientes
-              </Text>
-            </View>
-          )}
-
-          {route.completedOrders > 0 && (
-            <View style={[styles.routeStatPill, styles.routeCompletedPill]}>
-              <Text style={styles.routeCompletedText}>
-                {route.completedOrders} Entregados
-              </Text>
-            </View>
-          )}
-
-          {!!route.observedOrders && route.observedOrders > 0 && (
-            <View style={[styles.routeStatPill, { backgroundColor: "#FEF2F2" }]}>
-              <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "800" }}>
-                {route.observedOrders} Observados
-              </Text>
-            </View>
-          )}
         </View>
 
-        <View style={styles.routeArrowContainer}>
-          <Text style={styles.routeArrowText}>➔</Text>
-        </View>
+        <Text style={styles.routeSubtitleText}>
+          {getSubtitle()}
+        </Text>
       </View>
+
+      <Ionicons
+        name="chevron-forward"
+        size={18}
+        color={isInTransit ? "#D97706" : "#CBD5E1"}
+      />
     </TouchableOpacity>
   );
 };
@@ -253,22 +264,36 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#E2E8F0",
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 3,
     elevation: 1,
+  },
+  inTransitCard: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+    borderWidth: 1.5,
+  },
+  deliveredCard: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#DCFCE7",
+  },
+  observedCard: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
   },
   activeCard: {
     borderColor: "#3D5FFF",
     backgroundColor: "#F0F4FF",
+    borderWidth: 1.5,
   },
   lockedCard: {
     opacity: 0.45,
@@ -281,16 +306,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  inTransitNumberCircle: {
+    backgroundColor: "#F59E0B",
+  },
+  deliveredNumberCircle: {
+    backgroundColor: "#D1FAE5",
+  },
+  observedNumberCircle: {
+    backgroundColor: "#FEE2E2",
+  },
   activeNumberCircle: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#3D5FFF",
   },
   numberText: {
     fontSize: 13,
     fontWeight: "700",
     color: "#64748B",
   },
-  activeNumberText: {
-    color: "#475569",
+  whiteNumberText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
+  deliveredNumberText: {
+    color: "#059669",
+    fontWeight: "800",
+  },
+  observedNumberText: {
+    color: "#DC2626",
+    fontWeight: "800",
   },
   contentContainer: {
     flex: 1,
@@ -308,194 +351,110 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#94A3B8",
   },
-  pinContainer: {
-    width: 28,
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-  reorderContainer: {
-    flexDirection: "column",
+  chevronButton: {
+    padding: 4,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
-    gap: 4,
-  },
-  reorderBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reorderBtnText: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "bold",
-  },
-  routeCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    marginBottom: 12,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  inTransitRouteCard: {
-    borderColor: "#F59E0B",
-    backgroundColor: "#FFFBEB",
-  },
-  routeHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  routeIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  routeTitleContainer: {
-    flex: 1,
-  },
-  routeNameText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 2,
-  },
-  routeOriginText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#94A3B8",
-  },
-  routeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  routeBadgeText: {
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  routeDivider: {
-    height: 1,
-    backgroundColor: "#F1F5F9",
-    marginVertical: 12,
-  },
-  routeFooterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  routeStatsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap",
-    flex: 1,
-  },
-  routeStatPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    gap: 4,
-  },
-  routeStatPillLabel: {
-    fontSize: 11,
-    color: "#94A3B8",
-    fontWeight: "600",
-  },
-  routeStatPillValue: {
-    fontSize: 11,
-    color: "#0F172A",
-    fontWeight: "800",
-  },
-  routePendingPill: {
-    backgroundColor: "#F1F5F9",
-  },
-  routePendingText: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "800",
-  },
-  routeCompletedPill: {
-    backgroundColor: "#ECFDF5",
-  },
-  routeCompletedText: {
-    fontSize: 11,
-    color: "#059669",
-    fontWeight: "800",
-  },
-  routeArrowContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginLeft: 8,
-  },
-  routeActionPrompt: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#3D5FFF",
-  },
-  routeArrowText: {
-    fontSize: 12,
-    color: "#3D5FFF",
-    fontWeight: "bold",
   },
   groupBadge: {
-    backgroundColor: "#EEF2FF",
+    alignSelf: "flex-start",
+    backgroundColor: "#EFF6FF",
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-    marginBottom: 3,
+    borderRadius: 4,
+    marginBottom: 4,
   },
   groupBadgeText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: "800",
-    color: "#4F46E5",
-    letterSpacing: 0.5,
+    color: "#2563EB",
+    letterSpacing: 0.3,
   },
   groupedOrdersRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 4,
-    marginTop: 5,
+    marginTop: 6,
   },
   orderChip: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
-    gap: 2,
+    gap: 3,
   },
   orderChipText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#334155",
+    fontWeight: "600",
+    color: "#475569",
   },
   orderChipDelivered: {
     fontSize: 10,
     fontWeight: "800",
     color: "#10B981",
+  },
+  routeCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 12,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  inTransitRouteCard: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+    borderWidth: 1.5,
+  },
+  completedRouteCard: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#DCFCE7",
+  },
+  routeIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  routeMainInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  routeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  routeNameText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  routeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  routeBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  routeSubtitleText: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
   },
 });

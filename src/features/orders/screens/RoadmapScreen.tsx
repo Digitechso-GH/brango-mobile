@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, FlatList, ActivityIndicator, Alert, Platform, TouchableOpacity, Linking } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useOrders } from "../hooks/useOrders";
 import { useAuthStore } from "../../auth/store/useAuthStore";
@@ -411,11 +412,23 @@ export const RoadmapScreen = ({ navigation }: any) => {
           longitudeDelta: Math.max((maxLng - minLng) * 1.5, 0.03),
         });
       }
+    } else if (!selectedRoute && lastKnownLocation?.latitude && lastKnownLocation?.longitude) {
+      setSelectedRegion({
+        latitude: lastKnownLocation.latitude,
+        longitude: lastKnownLocation.longitude,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03,
+      });
     }
   }, [selectedRouteId, selectedRoute, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
 
   // Calcular waypoints de la ruta (La "Serpiente" que conecta las paradas en orden)
   const waypointCoordinates = useMemo(() => {
+    // Si NO hay ruta seleccionada (vista general de rutas), NO dibujar serpiente ni consumir tokens
+    if (!selectedRoute) {
+      return [];
+    }
+
     // Si la ruta está completada o no hay pedidos pendientes, NO dibujar serpiente
     if (isCurrentRouteCompleted || currentRoutePendingOrders.length === 0) {
       return [];
@@ -611,26 +624,9 @@ export const RoadmapScreen = ({ navigation }: any) => {
         });
       }
     });
-  } else {
-    // Modo vista general de rutas: mostrar pedidos pendientes de todas las rutas
-    pendingOrders.forEach((o, index) => {
-      if (o.latitude !== null && o.longitude !== null) {
-        const stopNumber = (typeof o.sequenceIndex === "number" && o.sequenceIndex > 0)
-          ? o.sequenceIndex
-          : (index + 1);
-
-        markers.push({
-          id: `dest-${o.id}`,
-          latitude: o.latitude,
-          longitude: o.longitude,
-          title: `${o.client} (Pendiente)`,
-          description: o.address,
-          color: o.status === ORDER_STATUS.IN_TRANSIT ? "#F59E0B" : "#3D5FFF",
-          label: stopNumber,
-        });
-      }
-    });
   }
+  // Nota: Si !selectedRoute (vista general de rutas asignadas), NO se agregan marcadores de pedidos.
+  // El chofer solo se verá a sí mismo en el mapa (ahorrando tokens y evitando unir rutas distintas).
 
   const handleFocusOrder = (order: Order) => {
     if (order.latitude !== null && order.longitude !== null) {
@@ -756,14 +752,21 @@ export const RoadmapScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header Compacto */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>¡Hola, {user?.name || "Conductor"}!</Text>
+        <Text style={styles.welcomeText} numberOfLines={1}>Hola, {user?.name || "Conductor"}</Text>
         <TouchableOpacity
           onPress={handleFinalizeShift}
           disabled={!isShiftFinalizable}
           style={[styles.logoutBtn, !isShiftFinalizable && styles.logoutBtnDisabled]}
           activeOpacity={0.7}
         >
-          <Text style={styles.logoutBtnText}>Cerrar Jornada</Text>
+          <Ionicons
+            name="log-out-outline"
+            size={16}
+            color={!isShiftFinalizable ? "#94A3B8" : "#334155"}
+          />
+          <Text style={[styles.logoutBtnText, !isShiftFinalizable && styles.logoutBtnTextDisabled]}>
+            Cerrar jornada
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -788,15 +791,16 @@ export const RoadmapScreen = ({ navigation }: any) => {
                 style={styles.backToRoutesBtn}
                 activeOpacity={0.7}
               >
-                <Text style={styles.backToRoutesText}>← Rutas</Text>
+                <Ionicons name="chevron-back" size={18} color="#475569" />
+                <Text style={styles.backToRoutesText}>Rutas</Text>
               </TouchableOpacity>
               <Text style={styles.sectionTitle}>{selectedRoute.name}</Text>
             </>
           ) : (
             <>
-              <Text style={styles.sectionTitle}>Rutas Asignadas</Text>
+              <Text style={styles.sectionTitle}>Rutas asignadas</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{routeGroups.length} {routeGroups.length === 1 ? "Ruta" : "Rutas"}</Text>
+                <Text style={styles.countBadgeText}>{routeGroups.length} {routeGroups.length === 1 ? "ruta" : "rutas"}</Text>
               </View>
             </>
           )}
@@ -901,7 +905,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
                   ? "Pedido ya gestionado"
                   : !currentRouteNextPendingOrder
                   ? "No hay pedidos pendientes"
-                  : "Iniciar Recorrido ▶"
+                  : "Iniciar recorrido →"
               }
               onPress={handleStartRoute}
               isLoading={isStartingRoute}

@@ -134,19 +134,85 @@ export const updateOrderStatus = async (
   }
 };
 
+async function uploadToR2WithRetry(
+  uploadUrl: string,
+  photoUri: string,
+  contentType: string,
+  filename: string,
+  maxRetries = 3
+): Promise<void> {
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", contentType);
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve();
+          } else {
+            reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error("Error de conexión de red al subir la evidencia a Cloudflare R2"));
+        };
+
+        if (photoUri.startsWith("data:")) {
+          try {
+            const base64Part = photoUri.split(",")[1] || photoUri;
+            const byteChars = atob(base64Part);
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) {
+              byteNumbers[i] = byteChars.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: contentType });
+            xhr.send(blob);
+          } catch (blobErr: any) {
+            xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
+          }
+        } else {
+          xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
+        }
+      });
+      return; // Éxito
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Cloudflare R2] Intento ${attempt}/${maxRetries} falló: ${err.message}`);
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 800));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export const uploadEvidencePhoto = async (
   routeAssignmentId: string,
   photoUri: string,
   signatureText?: string
 ): Promise<string> => {
   try {
-    const filename = photoUri.split("/").pop() || `evidence_${Date.now()}.jpg`;
-    const match = /\.(\w+)$/.exec(filename);
+    let cleanFilename = `evidence_${Date.now()}.jpg`;
+    if (photoUri && !photoUri.startsWith("data:")) {
+      const rawName = photoUri.split("/").pop();
+      if (rawName && rawName.length < 80 && !rawName.includes(";")) {
+        cleanFilename = rawName;
+      }
+    }
+    const match = /\.(\w+)$/.exec(cleanFilename);
     const contentType = match ? `image/${match[1]}` : "image/jpeg";
+    const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
 
     // 1. Obtener Presigned URL del backend
     const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
-      key: `evidence-${Date.now()}-${filename}`,
+      key: objectKey,
       contentType: contentType,
     });
 
@@ -157,30 +223,10 @@ export const uploadEvidencePhoto = async (
       throw new Error("No se pudo obtener la URL de subida de Cloudflare R2");
     }
 
-    // 2. Subir el archivo físico directamente a Cloudflare R2 usando XMLHttpRequest nativo
-    // Esto evita el error "Network request failed" de fetch() y las advertencias legacy de Expo 54
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", uploadUrl);
-      xhr.setRequestHeader("Content-Type", contentType);
+    // 2. Subir a Cloudflare R2 con reintentos automáticos
+    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, cleanFilename, 3);
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          resolve(true);
-        } else {
-          reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new Error("Network request failed during XMLHttpRequest upload"));
-      };
-
-      // En React Native, XHR soporta enviar un objeto con { uri, type, name } directamente
-      xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
-    });
-
-    // 4. Registrar la URL en el backend
+    // 3. Registrar la URL en el backend
     const evidenceBody: any = { s3Url: publicUrl };
     if (signatureText) {
       evidenceBody.signatureText = signatureText;
@@ -208,13 +254,20 @@ export const uploadGroupEvidencePhoto = async (
   signatureText?: string
 ): Promise<string> => {
   try {
-    const filename = photoUri.split("/").pop() || `evidence_${Date.now()}.jpg`;
-    const match = /\.(\w+)$/.exec(filename);
+    let cleanFilename = `evidence_${Date.now()}.jpg`;
+    if (photoUri && !photoUri.startsWith("data:")) {
+      const rawName = photoUri.split("/").pop();
+      if (rawName && rawName.length < 80 && !rawName.includes(";")) {
+        cleanFilename = rawName;
+      }
+    }
+    const match = /\.(\w+)$/.exec(cleanFilename);
     const contentType = match ? `image/${match[1]}` : "image/jpeg";
+    const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
 
     // 1. Obtener Presigned URL del backend (1 sola llamada a R2)
     const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
-      key: `evidence-${Date.now()}-${filename}`,
+      key: objectKey,
       contentType: contentType,
     });
 
@@ -225,26 +278,8 @@ export const uploadGroupEvidencePhoto = async (
       throw new Error("No se pudo obtener la URL de subida de Cloudflare R2");
     }
 
-    // 2. Subir el archivo físico a Cloudflare R2 usando XMLHttpRequest nativo
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", uploadUrl);
-      xhr.setRequestHeader("Content-Type", contentType);
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          resolve(true);
-        } else {
-          reject(new Error(`Error subiendo foto a R2: HTTP ${xhr.status} - ${xhr.responseText}`));
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new Error("Network request failed during XMLHttpRequest upload"));
-      };
-
-      xhr.send({ uri: photoUri, type: contentType, name: filename } as any);
-    });
+    // 2. Subir el archivo físico a Cloudflare R2 con reintentos automáticos
+    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, cleanFilename, 3);
 
     // 3. Registrar la misma URL en todas las filas de Evidence de las asignaciones consolidadas
     await apiClient.post(`${API_ENDPOINTS.ORDERS}/group-evidence`, {

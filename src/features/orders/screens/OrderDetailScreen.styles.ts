@@ -1,37 +1,38 @@
 import { StyleSheet, Platform } from "react-native";
-import { colors, commonStyles, shadows } from "../../../shared/theme/theme";
+import { colors } from "../../../shared/theme/theme";
 
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
   },
   header: {
-    ...commonStyles.header,
     paddingTop: Platform.OS === "ios" ? 54 : 36,
-    paddingBottom: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
   },
   headerBackButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
-  },
-  headerBackIcon: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: colors.textPrimary,
+    marginRight: 6,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#0F172A",
   },
   scrollContent: {
     flex: 1,
   },
   scrollContainer: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
   errorContainer: {
@@ -39,10 +40,10 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
   },
   errorText: {
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textMuted,
     marginBottom: 16,
   },
@@ -50,144 +51,240 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   backButtonText: {
-    color: colors.surface,
-    fontWeight: "700",
-  },
-  card: {
-    ...commonStyles.card,
-    marginBottom: 14,
-  },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    gap: 12,
-  },
-  tableRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  iconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.borderSubtle,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tableLabel: {
-    fontSize: 13,
+    color: "#FFFFFF",
     fontWeight: "600",
-    color: colors.textSecondary,
   },
-  tableValue: {
+
+  // Parada Conjunta Block
+  groupedCard: {
+    backgroundColor: "#F0F5FF",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+  },
+  groupedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+  groupedTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#1E3A8A",
+  },
+  groupedSubtitle: {
+    fontSize: 12,
+    color: "#64748B",
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  groupedOrdersList: {
+    gap: 8,
+  },
+  groupedOrderItem: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  groupedOrderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 10,
+  },
+  groupedOrderCode: {
     fontSize: 13,
-    fontWeight: "800",
-    color: colors.textPrimary,
-    textAlign: "right",
+    fontWeight: "700",
+    color: "#0F172A",
+    marginRight: 8,
+  },
+  groupedOrderClient: {
+    fontSize: 12,
+    color: "#64748B",
     flexShrink: 1,
   },
-  tableValueAddress: {
-    maxWidth: "60%",
+  badgePending: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  tableRowDivider: {
+  badgePendingText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#92400E",
+  },
+  badgeDelivered: {
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeDeliveredText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#065F46",
+  },
+
+  // Information List
+  infoList: {
+    marginBottom: 22,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 4,
+  },
+  infoIconBox: {
+    width: 24,
+    marginRight: 12,
+    marginTop: 2,
+    alignItems: "center",
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#64748B",
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: "#0F172A",
+    lineHeight: 18,
+  },
+  infoDivider: {
     height: 1,
-    backgroundColor: colors.background,
-    marginVertical: 2,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 10,
   },
+
   infoBanner: {
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
     padding: 12,
     marginTop: 14,
   },
   infoBannerText: {
     fontSize: 12,
-    color: "#1E40AF",
+    color: "#1D4ED8",
     lineHeight: 16,
-    fontWeight: "600",
+    fontWeight: "500",
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: colors.textPrimary,
-    marginBottom: 4,
+
+  // Photo / Evidence
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 2,
   },
-  cardSubtitle: {
+  sectionSubtitle: {
     fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 14,
-    lineHeight: 16,
+    color: "#64748B",
+    marginBottom: 12,
   },
   takePhotoButton: {
-    backgroundColor: colors.primaryLight,
-    borderWidth: 2,
-    borderColor: colors.primaryBorder,
+    borderWidth: 1.5,
+    borderColor: "#C7D2FE",
     borderStyle: "dashed",
-    borderRadius: 16,
-    paddingVertical: 24,
+    borderRadius: 14,
+    backgroundColor: "#FAFCFF",
+    paddingVertical: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-  cameraIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    marginBottom: 20,
   },
   takePhotoButtonText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  takePhotoSubtext: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
+    fontSize: 13.5,
+    fontWeight: "600",
+    marginTop: 6,
   },
   photoPreviewBox: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: colors.background,
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "#E2E8F0",
+    marginBottom: 20,
   },
   photoImage: {
     width: "100%",
-    height: 260,
-    resizeMode: "contain",
+    height: 240,
+    resizeMode: "cover",
   },
   retakePhotoButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: "center",
   },
   retakePhotoText: {
-    color: colors.surface,
+    color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
+  },
+
+  // Comment Box
+  commentSection: {
+    marginBottom: 14,
+  },
+  commentLabel: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 6,
   },
   textArea: {
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "#E2E8F0",
     borderRadius: 12,
     padding: 12,
     fontSize: 13,
-    color: colors.textPrimary,
+    color: "#0F172A",
     textAlignVertical: "top",
+    minHeight: 80,
   },
-  footerButtonsRow: {
-    flexDirection: "row",
-    gap: 12,
+
+  // Footer Buttons
+  footerContainer: {
     width: "100%",
   },
-  halfBtn: {
-    flex: 1,
+  footerPrimaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footerPrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14.5,
+    fontWeight: "700",
+  },
+  footerSecondaryButton: {
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+  },
+  footerSecondaryButtonText: {
+    color: "#EF4444",
+    fontSize: 13.5,
+    fontWeight: "600",
   },
 });
