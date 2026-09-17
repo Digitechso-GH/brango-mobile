@@ -323,7 +323,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
     return currentRoutePendingOrders.find((o) => o.status === ORDER_STATUS.PENDING) || null;
   }, [currentRoutePendingOrders]);
 
-  const targetOrder = currentRouteInTransitOrder || currentRouteNextPendingOrder;
+  
 
   const isCurrentRouteCompleted = useMemo(() => {
     if (!selectedRoute) return false;
@@ -386,6 +386,8 @@ export const RoadmapScreen = ({ navigation }: any) => {
   const orderToDisplay = focusedOrderId
     ? (activeOrdersForView.find((o) => o.id === focusedOrderId) || null)
     : null;
+
+  const targetOrder = currentRouteInTransitOrder || (orderToDisplay?.status === ORDER_STATUS.PENDING ? orderToDisplay : null);
 
   // Centrar mapa al seleccionar una ruta
   useEffect(() => {
@@ -901,10 +903,10 @@ export const RoadmapScreen = ({ navigation }: any) => {
                   ? "Iniciando Recorrido..."
                   : currentRouteInTransitOrder
                   ? "Recorrido en Curso"
-                  : orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING
+                  : !orderToDisplay
+                  ? "Selecciona pedido para iniciar"
+                  : orderToDisplay.status !== ORDER_STATUS.PENDING
                   ? "Pedido ya gestionado"
-                  : !currentRouteNextPendingOrder
-                  ? "No hay pedidos pendientes"
                   : "Iniciar recorrido →"
               }
               onPress={handleStartRoute}
@@ -912,8 +914,8 @@ export const RoadmapScreen = ({ navigation }: any) => {
               disabled={
                 isStartingRoute ||
                 !!currentRouteInTransitOrder ||
-                (!!orderToDisplay && orderToDisplay.status !== ORDER_STATUS.PENDING) ||
-                (!orderToDisplay && !currentRouteNextPendingOrder)
+                !orderToDisplay ||
+                orderToDisplay.status !== ORDER_STATUS.PENDING
               }
               variant="primary"
             />
