@@ -904,7 +904,7 @@ export const RoadmapScreen = ({ navigation }: any) => {
                   : currentRouteInTransitOrder
                   ? "Recorrido en Curso"
                   : !orderToDisplay
-                  ? "Selecciona pedido para iniciar"
+                  ? "Selecciona un pedido para iniciar"
                   : orderToDisplay.status !== ORDER_STATUS.PENDING
                   ? "Pedido ya gestionado"
                   : "Iniciar recorrido →"

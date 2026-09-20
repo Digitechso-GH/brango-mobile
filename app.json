@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "bran-go-mobile",
-    "slug": "bran-go-mobile",
+    "name": "Brango Mobile",
+    "slug": "brango-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -30,7 +30,12 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.jsm788steam.brangomobile"
     },
@@ -51,14 +56,12 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "08aa3173-1e50-4a48-b7dc-61690d65273f"
+        "projectId": "1dd5ef01-11cd-4373-ad4b-eb329506103a"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/08aa3173-1e50-4a48-b7dc-61690d65273f"
-    }
+    "owner": "rrojashs-team"
   }
 }
