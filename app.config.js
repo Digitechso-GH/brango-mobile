@@ -3,7 +3,8 @@
 
   return {
     ...config,
-    name: isPreview ? config.name + ' (Preview)' : config.name,
+    // Eliminamos el sufijo '(Preview)' para que siempre se llame BranGo
+    name: config.name,
     ios: {
       ...config.ios,
       bundleIdentifier: isPreview 
