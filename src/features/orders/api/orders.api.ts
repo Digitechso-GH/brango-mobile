@@ -199,15 +199,14 @@ export const uploadEvidencePhoto = async (
   signatureText?: string
 ): Promise<string> => {
   try {
-    let cleanFilename = `evidence_${Date.now()}.jpg`;
+    let cleanFilename = `evidence_${Date.now()}.jpeg`;
     if (photoUri && !photoUri.startsWith("data:")) {
       const rawName = photoUri.split("/").pop();
       if (rawName && rawName.length < 80 && !rawName.includes(";")) {
         cleanFilename = rawName;
       }
     }
-    const match = /\.(\w+)$/.exec(cleanFilename);
-    const contentType = match ? `image/${match[1]}` : "image/jpeg";
+    const contentType = photoUri.endsWith(".png") ? "image/png" : "image/jpeg";
     const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
 
     // 1. Obtener Presigned URL del backend
@@ -254,15 +253,14 @@ export const uploadGroupEvidencePhoto = async (
   signatureText?: string
 ): Promise<string> => {
   try {
-    let cleanFilename = `evidence_${Date.now()}.jpg`;
+    let cleanFilename = `evidence_${Date.now()}.jpeg`;
     if (photoUri && !photoUri.startsWith("data:")) {
       const rawName = photoUri.split("/").pop();
       if (rawName && rawName.length < 80 && !rawName.includes(";")) {
         cleanFilename = rawName;
       }
     }
-    const match = /\.(\w+)$/.exec(cleanFilename);
-    const contentType = match ? `image/${match[1]}` : "image/jpeg";
+    const contentType = photoUri.endsWith(".png") ? "image/png" : "image/jpeg";
     const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
 
     // 1. Obtener Presigned URL del backend (1 sola llamada a R2)
