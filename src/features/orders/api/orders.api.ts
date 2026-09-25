@@ -199,15 +199,9 @@ export const uploadEvidencePhoto = async (
   signatureText?: string
 ): Promise<string> => {
   try {
-    let cleanFilename = `evidence_${Date.now()}.jpeg`;
-    if (photoUri && !photoUri.startsWith("data:")) {
-      const rawName = photoUri.split("/").pop();
-      if (rawName && rawName.length < 80 && !rawName.includes(";")) {
-        cleanFilename = rawName;
-      }
-    }
-    const contentType = photoUri.endsWith(".png") ? "image/png" : "image/jpeg";
-    const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
+    const extension = photoUri.endsWith(".png") ? "png" : "jpeg";
+    const contentType = `image/${extension}`;
+    const objectKey = `evidence-${Date.now()}.${extension}`;
 
     // 1. Obtener Presigned URL del backend
     const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
@@ -223,7 +217,7 @@ export const uploadEvidencePhoto = async (
     }
 
     // 2. Subir a Cloudflare R2 con reintentos automáticos
-    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, cleanFilename, 3);
+    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, objectKey, 3);
 
     // 3. Registrar la URL en el backend
     const evidenceBody: any = { s3Url: publicUrl };
@@ -253,15 +247,9 @@ export const uploadGroupEvidencePhoto = async (
   signatureText?: string
 ): Promise<string> => {
   try {
-    let cleanFilename = `evidence_${Date.now()}.jpeg`;
-    if (photoUri && !photoUri.startsWith("data:")) {
-      const rawName = photoUri.split("/").pop();
-      if (rawName && rawName.length < 80 && !rawName.includes(";")) {
-        cleanFilename = rawName;
-      }
-    }
-    const contentType = photoUri.endsWith(".png") ? "image/png" : "image/jpeg";
-    const objectKey = `evidence-${Date.now()}-${cleanFilename}`;
+    const extension = photoUri.endsWith(".png") ? "png" : "jpeg";
+    const contentType = `image/${extension}`;
+    const objectKey = `evidence-${Date.now()}.${extension}`;
 
     // 1. Obtener Presigned URL del backend (1 sola llamada a R2)
     const presignedRes = await apiClient.post(`${API_ENDPOINTS.ORDERS}/presigned-url`, {
@@ -277,7 +265,7 @@ export const uploadGroupEvidencePhoto = async (
     }
 
     // 2. Subir el archivo físico a Cloudflare R2 con reintentos automáticos
-    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, cleanFilename, 3);
+    await uploadToR2WithRetry(uploadUrl, photoUri, contentType, objectKey, 3);
 
     // 3. Registrar la misma URL en todas las filas de Evidence de las asignaciones consolidadas
     await apiClient.post(`${API_ENDPOINTS.ORDERS}/group-evidence`, {

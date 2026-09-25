@@ -1,70 +1,84 @@
-﻿{
-    "expo":  {
-                 "name":  "BranGo",
-                 "slug":  "brango-mobile",
-                 "version":  "1.0.0",
-                 "orientation":  "portrait",
-                 "icon":  "./assets/icon.png",
-                 "userInterfaceStyle":  "light",
-                 "ios":  {
-                             "supportsTablet":  true,
-                             "config":  {
-                                            "googleMapsApiKey":  "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
-                                        }
-                         },
-                 "android":  {
-                                 "config":  {
-                                                "googleMaps":  {
-                                                                   "apiKey":  "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
-                                                               }
-                                            },
-                                 "adaptiveIcon":  {
-                                                      "backgroundColor":  "#FFFFFF",
-                                                      "foregroundImage":  "./assets/android-icon-foreground.png"
-                                                  },
-                                 "predictiveBackGestureEnabled":  false,
-                                 "permissions":  [
-                                                     "ACCESS_COARSE_LOCATION",
-                                                     "ACCESS_FINE_LOCATION",
-                                                     "ACCESS_BACKGROUND_LOCATION",
-                                                     "FOREGROUND_SERVICE",
-                                                     "FOREGROUND_SERVICE_LOCATION",
-                                                     "android.permission.ACCESS_COARSE_LOCATION",
-                                                     "android.permission.ACCESS_FINE_LOCATION",
-                                                     "android.permission.ACCESS_BACKGROUND_LOCATION",
-                                                     "android.permission.FOREGROUND_SERVICE",
-                                                     "android.permission.FOREGROUND_SERVICE_LOCATION"
-                                                 ],
-                                 "package":  "com.jsm788steam.brangomobile"
-                             },
-                 "web":  {
-                             "favicon":  "./assets/favicon.png"
-                         },
-                 "plugins":  [
-                                 "expo-secure-store",
-                                 "expo-font",
-                                 [
-                                     "expo-location",
-                                     {
-                                         "locationAlwaysAndWhenInUsePermission":  "BranGo necesita acceso a tu ubicaciÃ³n en segundo plano para el seguimiento de la ruta.",
-                                         "isAndroidBackgroundLocationEnabled":  true,
-                                         "isAndroidForegroundServiceEnabled":  true
-                                     }
-                                 ]
-                             ],
-                 "extra":  {
-                               "eas":  {
-                                           "projectId":  "1dd5ef01-11cd-4373-ad4b-eb329506103a"
-                                       }
-                           },
-                 "runtimeVersion":  {
-                                        "policy":  "appVersion"
-                                    },
-                 "owner":  "rrojashs-team",
-                 "splash":  {
-                                "backgroundColor":  "#ffffff",
-                                "resizeMode":  "contain",
-                                "image":  "./assets/splash-icon.png"
-                            }
-             }
+{
+  "expo": {
+    "name": "BranGo",
+    "slug": "brango-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
+      },
+      "bundleIdentifier": "com.jsm788steam.brangomobile"
+    },
+    "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
+        }
+      },
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "package": "com.jsm788steam.brangomobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "BranGo necesita acceso a tu ubicaciÃ³n en segundo plano para el seguimiento de la ruta.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1dd5ef01-11cd-4373-ad4b-eb329506103a"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "rrojashs-team",
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1dd5ef01-11cd-4373-ad4b-eb329506103a"
+    }
+  }
 }
