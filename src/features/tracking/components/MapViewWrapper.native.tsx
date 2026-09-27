@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
-import { useMapId, MapTheme } from "../hooks/useMapId";
+import MapView, { Marker, Polyline } from "react-native-maps";
+
+
 
 interface MapViewWrapperProps {
   style?: any;
@@ -13,8 +14,6 @@ interface MapViewWrapperProps {
   };
   scrollEnabled?: boolean;
   zoomEnabled?: boolean;
-  theme?: MapTheme;
-  googleMapId?: string;
   focusKey?: number;
   markers?: Array<{
     id: string | number;
@@ -38,14 +37,12 @@ export const MapViewWrapper = ({
   initialRegion,
   scrollEnabled = true,
   zoomEnabled = true,
-  theme,
-  googleMapId: customMapId,
   focusKey,
   markers = [],
   routeCoordinates = [],
 }: MapViewWrapperProps) => {
-  const dynamicMapId = useMapId(theme);
-  const activeMapId = customMapId || dynamicMapId;
+
+
 
   const [tracksViewChanges, setTracksViewChanges] = React.useState(true);
 
@@ -59,8 +56,7 @@ export const MapViewWrapper = ({
 
   return (
     <MapView
-      provider={PROVIDER_GOOGLE}
-      googleMapId={activeMapId}
+
       style={style}
       region={initialRegion}
       showsUserLocation={true}

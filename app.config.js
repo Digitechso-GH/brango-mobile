@@ -7,14 +7,14 @@
     ios: {
       ...config.ios,
       bundleIdentifier: isPreview 
-        ? 'com.jsm788steam.brangomobile.preview' 
-        : 'com.jsm788steam.brangomobile'
+        ? 'com.digitechgroup.brangomobile.preview' 
+        : 'com.digitechgroup.brangomobile'
     },
     android: {
       ...config.android,
       package: isPreview 
-        ? 'com.jsm788steam.brangomobile.preview' 
-        : 'com.jsm788steam.brangomobile'
+        ? 'com.digitechgroup.brangomobile.preview' 
+        : 'com.digitechgroup.brangomobile'
     }
   };
 };

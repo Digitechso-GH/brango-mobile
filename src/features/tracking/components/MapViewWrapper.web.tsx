@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View } from "react-native";
 import { GOOGLE_MAPS_API_KEY } from "../../../shared/config/env";
-import { useMapId, MapTheme } from "../hooks/useMapId";
+
 
 declare const google: any;
 
@@ -15,8 +15,8 @@ interface MapViewWrapperProps {
   };
   scrollEnabled?: boolean;
   zoomEnabled?: boolean;
-  theme?: MapTheme;
-  googleMapId?: string;
+
+
   focusKey?: number;
   markers?: Array<{
     id: string | number;
@@ -38,8 +38,8 @@ interface MapViewWrapperProps {
 export const MapViewWrapper = ({
   style,
   initialRegion,
-  theme,
-  googleMapId: customMapId,
+
+
   markers = [],
   routeCoordinates = [],
 }: MapViewWrapperProps) => {
@@ -47,8 +47,8 @@ export const MapViewWrapper = ({
   const mapRef = useRef<any>(null);
   const renderedObjectsRef = useRef<any[]>([]);
 
-  const dynamicMapId = useMapId(theme);
-  const activeMapId = customMapId || dynamicMapId || undefined;
+
+  const activeMapId = undefined;
 
   useEffect(() => {
     if (typeof window === "undefined" || !containerRef.current) return;

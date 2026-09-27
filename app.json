@@ -11,7 +11,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
       },
-      "bundleIdentifier": "com.jsm788steam.brangomobile"
+      "bundleIdentifier": "com.digitechgroup.brangomobile"
     },
     "android": {
       "config": {
@@ -46,7 +46,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.jsm788steam.brangomobile"
+      "package": "com.digitechgroup.brangomobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -65,20 +65,18 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "1dd5ef01-11cd-4373-ad4b-eb329506103a"
+        "projectId": "13a4e18f-7010-4d58-ac0c-bc4008d4ee66"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "rrojashs-team",
+    "owner": "digitech-group",
     "splash": {
       "backgroundColor": "#ffffff",
       "resizeMode": "contain",
       "image": "./assets/splash-icon.png"
     },
-    "updates": {
-      "url": "https://u.expo.dev/1dd5ef01-11cd-4373-ad4b-eb329506103a"
-    }
+    "updates": {}
   }
 }
