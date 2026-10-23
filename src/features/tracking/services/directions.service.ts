@@ -47,32 +47,19 @@ export function decodePolyline(encoded: string): LatLng[] {
   return points;
 }
 
+// Caché en memoria para evitar llamadas redundantes a la API de Google Directions
+const streetRouteCache = new Map<string, LatLng[]>();
+
+function getCacheKey(points: LatLng[]): string {
+  // Redondear a 4 decimales (~11 metros de tolerancia) para agrupar puntos idénticos o casi idénticos
+  return points.map((p) => `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`).join(";");
+}
+
 /**
- * Consulta a la API de Google Maps Directions para obtener la ruta navegable por calles
+ * Consulta a la API de Google Maps Routes (v2) para obtener la ruta navegable por calles
  */
 export async function getStreetRoute(origin: LatLng, destination: LatLng): Promise<LatLng[]> {
-  try {
-    if (!GOOGLE_MAPS_API_KEY) {
-      return [origin, destination];
-    }
-
-    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
-    
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.status === "OK" && data.routes && data.routes.length > 0) {
-      const points = data.routes[0]?.overview_polyline?.points;
-      if (points) {
-        return decodePolyline(points);
-      }
-    }
-  } catch (error) {
-    console.log("Error consultando la ruta en Google Directions:", error);
-  }
-
-  // Fallback si no hay clave de API de Direcciones o falla la red: linea directa entre los 2 puntos
-  return [origin, destination];
+  return getFullStreetPath([origin, destination]);
 }
 
 export async function getFullStreetPath(waypoints: LatLng[]): Promise<LatLng[]> {
@@ -82,30 +69,75 @@ export async function getFullStreetPath(waypoints: LatLng[]): Promise<LatLng[]> 
     return waypoints;
   }
 
+  // Verificar caché antes de consumir la cuota de Google
+  const cacheKey = getCacheKey(waypoints);
+  if (streetRouteCache.has(cacheKey)) {
+    return streetRouteCache.get(cacheKey)!;
+  }
+
   const origin = waypoints[0];
   const destination = waypoints[waypoints.length - 1];
   const intermediates = waypoints.slice(1, -1);
 
-  let waypointsParam = "";
+  const body: any = {
+    origin: {
+      location: {
+        latLng: {
+          latitude: origin.latitude,
+          longitude: origin.longitude,
+        },
+      },
+    },
+    destination: {
+      location: {
+        latLng: {
+          latitude: destination.latitude,
+          longitude: destination.longitude,
+        },
+      },
+    },
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE",
+  };
+
   if (intermediates.length > 0) {
-    const joined = intermediates.map((w) => `${w.latitude},${w.longitude}`).join("|");
-    waypointsParam = `&waypoints=${joined}`;
+    body.intermediates = intermediates.map((w) => ({
+      location: {
+        latLng: {
+          latitude: w.latitude,
+          longitude: w.longitude,
+        },
+      },
+    }));
   }
 
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}${waypointsParam}&key=${GOOGLE_MAPS_API_KEY}`;
-
   try {
-    const res = await fetch(url);
+    const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": "routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify(body),
+    });
+
     const data = await res.json();
 
-    if (data.status === "OK" && data.routes && data.routes.length > 0) {
-      const points = data.routes[0]?.overview_polyline?.points;
+    if (data.routes && data.routes.length > 0) {
+      const points = data.routes[0]?.polyline?.encodedPolyline;
       if (points) {
-        return decodePolyline(points);
+        const decoded = decodePolyline(points);
+        if (streetRouteCache.size > 50) {
+          const first = streetRouteCache.keys().next().value;
+          if (first) streetRouteCache.delete(first);
+        }
+        streetRouteCache.set(cacheKey, decoded);
+        return decoded;
       }
     }
   } catch (error) {
-    console.log("Error consultando la ruta anidada completa:", error);
+    console.log("Error consultando Google Routes API:", error);
   }
 
   return waypoints;

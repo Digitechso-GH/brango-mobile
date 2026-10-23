@@ -9,14 +9,14 @@
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
+        "googleMapsApiKey": "AIzaSyDXRc-FafiYae7qJTjTNfQbYtFL1J8og_s"
       },
       "bundleIdentifier": "com.digitechgroup.brangomobile"
     },
     "android": {
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyC9fgUh03hZPzLGOv_iJIUd55WVWCkOBKk"
+          "apiKey": "AIzaSyDXRc-FafiYae7qJTjTNfQbYtFL1J8og_s"
         }
       },
       "adaptiveIcon": {

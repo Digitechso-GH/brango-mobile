@@ -424,7 +424,17 @@ export const RoadmapScreen = ({ navigation }: any) => {
     }
   }, [selectedRouteId, selectedRoute, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
 
+  // Clave representativa de las paradas pendientes para no recalcular innecesariamente
+  const pendingOrdersKey = useMemo(() => {
+    return currentRoutePendingOrders.map((o) => `${o.id}-${o.status}-${o.sequenceIndex}`).join("|");
+  }, [currentRoutePendingOrders]);
+
+  const hasGpsFix = Boolean(lastKnownLocation?.latitude && lastKnownLocation?.longitude);
+
   // Calcular waypoints de la ruta (La "Serpiente" que conecta las paradas en orden)
+  // OPTIMIZACIÓN CRÍTICA: NO depender de lastKnownLocation.latitude / longitude continuas.
+  // Solo se recalculan los puntos cuando cambia la ruta, cuando cambia la lista de paradas
+  // pendientes (ej. pedido entregado/observado), o cuando se adquiere señal GPS por primera vez.
   const waypointCoordinates = useMemo(() => {
     // Si NO hay ruta seleccionada (vista general de rutas), NO dibujar serpiente ni consumir tokens
     if (!selectedRoute) {
@@ -456,7 +466,14 @@ export const RoadmapScreen = ({ navigation }: any) => {
     });
 
     return points;
-  }, [isCurrentRouteCompleted, currentRoutePendingOrders, orderToDisplay?.status, lastKnownLocation?.latitude, lastKnownLocation?.longitude]);
+  }, [
+    selectedRouteId,
+    selectedRoute?.id,
+    isCurrentRouteCompleted,
+    pendingOrdersKey,
+    orderToDisplay?.status,
+    hasGpsFix,
+  ]);
 
   useEffect(() => {
     let isMounted = true;

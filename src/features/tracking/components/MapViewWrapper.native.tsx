@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 
 
 
@@ -56,7 +56,7 @@ export const MapViewWrapper = ({
 
   return (
     <MapView
-
+      provider={PROVIDER_GOOGLE}
       style={style}
       region={initialRegion}
       showsUserLocation={true}
